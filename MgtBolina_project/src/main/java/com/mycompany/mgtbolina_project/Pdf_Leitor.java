@@ -6,7 +6,7 @@ import org.apache.pdfbox.Loader;
 import java.io.File;
 import java.io.IOException;
 
-public class Pdf_Extractor {
+public class Pdf_Leitor {
     
     public String ExtractText(String filePath){
          //PDD.load serve para abrir o arquivo
@@ -22,4 +22,6 @@ public class Pdf_Extractor {
              return null;
          }
     }
+    
+    
 }
