@@ -20,7 +20,9 @@ public class pdf_coletor_dados {
     
     
     
-    public String ExtractDanfeNumber(String texto){
+    public String ExtractDanfeNumber(String textoCompleto){
+       String regex = "N°\\s+([\\d\\.]+)";
        
+       return FindFistGroup(textoCompleto, regex);
     }
 }
