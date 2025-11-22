@@ -25,4 +25,16 @@ public class pdf_coletor_dados {
        
        return FindFistGroup(textoCompleto, regex);
     }
+    
+    public String ExtractTotalNumber(String textoCompleto){
+        String regex = "VALOR TOTAL DA NOTA[\\s\\n]+([\\d\\.,]+)";
+        
+        return FindFistGroup(textoCompleto, regex);
+    }
+    
+    public String ExtracPlacaVeiculo(String textoCompleto){
+        String regex = "PLACA DO VEÍCULO[\\s\\n]+([A-Z0-9]{7,8})";
+        
+        return FindFistGroup(textoCompleto, regex);
+    }
 }
