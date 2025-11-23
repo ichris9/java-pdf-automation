@@ -2,6 +2,8 @@ package com.mycompany.mgtbolina_project;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.ArrayList; 
+import java.util.List;
 
 public class pdf_coletor_dados {
     
@@ -36,5 +38,25 @@ public class pdf_coletor_dados {
         String regex = "PLACA DO VEÍCULO[\\s+\\n]+([A-Z0-9]{7,7})";
         
         return FindFistGroup(textoCompleto, regex);
+    }
+    
+    //extração tabela de itens(retorna uma lsita)
+    public List<String[]> extractProductItens(String textoCompleto){
+        List<String[]> itens = new ArrayList<>();
+        
+        String regex = 
+                "DADOS DO PRODUTO / SERVIÇO .*? ([A-Za-z0-9])"; 
+                
+        Pattern pattern = Pattern.compile(regex, Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+        Matcher matcher = pattern.matcher(textoCompleto);
+        
+        while (matcher.find()){
+            String descricao = matcher.group(1);
+            String vUnit = matcher.group(2);
+            String vTotal = matcher.group(3);
+            
+            itens.add(new String[]{descricao, vUnit, vTotal});
+        }
+        return itens;
     }
 }
