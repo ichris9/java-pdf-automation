@@ -40,6 +40,8 @@ public class pdf_coletor_dados {
         return FindFistGroup(textoCompleto, regex);
     }
     
+    
+    
     //extração tabela de itens(retorna uma lsita)
     public List<String[]> extractProductItens(String textoCompleto){
         List<String[]> itens = new ArrayList<>();

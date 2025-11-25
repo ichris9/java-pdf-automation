@@ -2,56 +2,71 @@ package com.mycompany.mgtbolina_project;
 
 import java.io.FileOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 
 //apachePOI
 import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 public class Exportador_Excel {
     
     public void ExportDataTOExcel(String filePath, String numNota, String valorTotal){
         
-        //cria aba
-        try(Workbook workbook = WorkbookFactory.create(new File (filePath))){
+        
+        try{
+            FileInputStream LeituraByts = new FileInputStream(filePath);//pegas os bytes do arquivo
+            XSSFWorkbook workbook = new XSSFWorkbook(LeituraByts);//faz a leitura dos bytes e faz um .xlsx manipulavel
+            XSSFSheet sheet = workbook.getSheetAt(0);
             
-            Sheet sheet = workbook.getSheetAt(0);//pega a primeira aba
+            //ler cabeçalhos
+            Row headers = sheet.getRow(0);
             
-            Row rowNota = sheet.getRow(1);
-            if(rowNota == null) {
-                System.err.println("Erro: A linha de destino (Linha 2) não existe no template. A formatação será perdida.");
-                rowNota = sheet.createRow(1);
+            int colNota = -1;
+            int colTotal = -1;
+            
+            for(Cell cell: headers){
+                String nome = cell.getStringCellValue().trim();
+                
+                if(nome.equalsIgnoreCase("NOTA")){
+                    colNota = cell.getColumnIndex();
+                }
+                
+                if(nome.equalsIgnoreCase("VALOR")){
+                    colTotal = cell.getColumnIndex();
+                }
             }
-            
-            // --- 2. RECUPERA CÉLULAS E ESTILOS (A2 e B2) ---
-            
-            // Célula A2 (Índice 0)
-            Cell cell0 = rowNota.getCell(0);
-            // Se a célula A2 não existe, a formatação já está em risco.
-            if(cell0 == null) {
-                cell0 = rowNota.createCell(0);
+            if (colNota == -1 || colTotal == -1) {
+            throw new RuntimeException("Não foi encontrado a coluna 'NOTA' ou 'VALOR' no cabeçalho");
             }
-            // AQUI OCORRE O PREENCHIMENTO: Apenas altera o VALOR
-            cell0.setCellValue(numNota);
+                //#escrita
+                
+                int lastRow = sheet.getLastRowNum()+1;
+                Row newRow = sheet.createRow(lastRow);
+                
+                newRow.createCell(colNota).setCellValue(numNota);
+                newRow.createCell(colTotal).setCellValue(valorTotal);
+                
+                //escrita
+                LeituraByts.close();
+                
+                FileOutputStream saidaBytes = new FileOutputStream(filePath);
+                
+                workbook.write(saidaBytes);
+                
+                saidaBytes.close();
+                
+                workbook.close();
+        
             
-            // Célula B2 (Índice 1)
-            Cell cell1 = rowNota.getCell(1);
-            if(cell1 == null) {
-                cell1 = rowNota.createCell(1);
-            }
-            cell1.setCellValue(valorTotal);
-            
-            // --- 3. SALVA O ARQUIVO ---
-            try(FileOutputStream out = new FileOutputStream(filePath)){
-                workbook.write(out);
-                System.out.println("✅ Sucesso: Dados exportados, checar formatação em: " + filePath);
-            }
-            
-        }catch(Exception e){
-                System.err.println("❌ Erro ao manipular o Excel: " + e.getMessage());
-            e.printStackTrace();
+        }catch(IOException e){
+            System.out.println("IOException");
         }
     }
 }

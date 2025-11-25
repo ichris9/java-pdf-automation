@@ -5,30 +5,30 @@ import java.util.List;
 
 public class MgtBolina_project {
     public static void main(String[] args) {
-       File pdfFile = new File("C:\\Users\\chris\\Downloads\\notafiscal-notebook.pdf");
+       File pdfFile = new File("C:\\Users\\chris\\Downloads\\danfe - 858100.PDF");
         
        //lê o pdf
        Pdf_Leitor leitor = new Pdf_Leitor();
        
        //pega todo o texto o pdf
-       String textoBruto = leitor.ExtractText(pdfFile.getPath());
+       String textoBruto = leitor.ExtractText(pdfFile.getAbsolutePath());
         
        
        if(textoBruto != null){
          
            pdf_coletor_dados coletor = new pdf_coletor_dados();
            
-           //texto brto para extrair dados com regex
+           //texto bruto para extrair dados com regex
            String numNota = coletor.ExtractDanfeNumber(textoBruto);
-           String numTotal= coletor.ExtractTotalNumber(textoBruto);
-           String placaVeiclo = coletor.ExtracPlacaVeiculo(textoBruto);
+           String numTotal = coletor.ExtractTotalNumber(textoBruto);
+           String placaVeiculo = coletor.ExtracPlacaVeiculo(textoBruto);
            
            List<String[]> itemsExtraidos = coletor.extractProductItens(textoBruto);
            System.out.println("==========================");
            System.out.println(">>> DADOS DA NOTA <<<");
             System.out.println("==========================");
            System.out.println("Numero da Nota: " + numNota);
-          // System.out.println("Placa veiculo: " + placaVeiclo);
+          // System.out.println("Placa veiculo: " + placaVeiculo);
            System.out.println("Total da nota: "+ numTotal);
            
            //impressão tabela de itens
@@ -51,9 +51,9 @@ public class MgtBolina_project {
            //exportar para excel
            Exportador_Excel exporter = new Exportador_Excel();
            
-           String excelFiePath = "C:\\Users\\chris\\OneDrive\\Documents\\Teste1-pdf.xlsx";
+           String excelFilePath = "C:\\Users\\chris\\OneDrive\\Documents\\teste1.xlsx";
            
-           exporter.ExportDataTOExcel(excelFiePath, numNota, numTotal);
+           exporter.ExportDataTOExcel(excelFilePath, numNota, numTotal);
         
        }
     }
