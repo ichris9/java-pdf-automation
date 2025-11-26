@@ -35,7 +35,25 @@ public class pdf_coletor_dados {
     }
     
     public String ExtracPlacaVeiculo(String textoCompleto){
-        String regex = "PLACA DO VEÍCULO[\\s+\\n]+([A-Z0-9]{7,7})";
+        String regex = "(?si)PLACA DO VEÍCULO.*?((?:[A-Z]{3}\\d{4})|(?:[A-Z]{3}\\d[A-Z]\\d{2}))";
+        
+        return FindFistGroup(textoCompleto, regex);
+    }
+    
+    public String ExtractRazaoSocial(String textoCompleto){
+        String regex ="(?si) NOME RAZÃO SOCIAL .*?([A-Z{2,}])";
+
+        return FindFistGroup(textoCompleto, regex);
+    }
+    
+    public String ExtractDate(String TextCompleto){
+        String regex ="(?si)DATA DE EMISSÃO .*?([\\d]{2}\\/[\\d]{2}\\/[\\d]{4})";
+        
+        return FindFistGroup(TextCompleto, regex);
+    }
+    
+    public String ExtractObra(String textoCompleto){
+        String regex = "";
         
         return FindFistGroup(textoCompleto, regex);
     }

@@ -22,14 +22,20 @@ public class MgtBolina_project {
            String numNota = coletor.ExtractDanfeNumber(textoBruto);
            String numTotal = coletor.ExtractTotalNumber(textoBruto);
            String placaVeiculo = coletor.ExtracPlacaVeiculo(textoBruto);
+           String razaoSocial = coletor.ExtractRazaoSocial(textoBruto);
+           String data = coletor.ExtractDate(textoBruto);
+           //String obra = coletor.ExtractObra(textoBruto);
            
            List<String[]> itemsExtraidos = coletor.extractProductItens(textoBruto);
            System.out.println("==========================");
            System.out.println(">>> DADOS DA NOTA <<<");
-            System.out.println("==========================");
+           System.out.println("==========================");
            System.out.println("Numero da Nota: " + numNota);
-          // System.out.println("Placa veiculo: " + placaVeiculo);
+           System.out.println("Placa veiculo: " + placaVeiculo);
            System.out.println("Total da nota: "+ numTotal);
+           System.out.println("Fornecedor: " + razaoSocial);
+           System.out.println("Data: " + data);
+          // System.out.println("Obra: " + obra);
            
            //impressão tabela de itens
            
