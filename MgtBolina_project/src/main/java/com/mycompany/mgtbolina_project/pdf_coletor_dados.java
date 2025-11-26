@@ -23,13 +23,13 @@ public class pdf_coletor_dados {
     
     
     public String ExtractDanfeNumber(String textoCompleto){
-       String regex = "[1\\s\\-\\s SAÍDA\\n]([\\d]{6,6})";
+       String regex = "[N \\n\\s+]([0-9\\.0-9]{7,8})";
        
        return FindFistGroup(textoCompleto, regex);
     }
     
     public String ExtractTotalNumber(String textoCompleto){
-        String regex = "VALOR TOTAL DOS PRODUTOS[\\s+\\n+]+([\\d\\.,]+)";
+        String regex = "(?si)VALOR TOTAL DOS PRODUTOS.*?((?:\\d{1,3}(?:\\.\\d{3})*|\\d+),\\d{2})";
         
         return FindFistGroup(textoCompleto, regex);
     }
