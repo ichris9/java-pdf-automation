@@ -17,7 +17,7 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 public class Exportador_Excel {
     
-    public void ExportDataTOExcel(String filePath, String numNota, String valorTotal){
+    public void ExportDataTOExcel(String filePath, String numNota, String valorTotal, String data, String placaVeic, String forn){
         
         
         try{
@@ -30,6 +30,9 @@ public class Exportador_Excel {
             
             int colNota = -1;
             int colTotal = -1;
+            int colData = -1;
+            int colPlacaVeiculo = -1;
+            int colForn = -1;
             
             for(Cell cell: headers){
                 String nome = cell.getStringCellValue().trim();
@@ -40,6 +43,18 @@ public class Exportador_Excel {
                 
                 if(nome.equalsIgnoreCase("VALOR")){
                     colTotal = cell.getColumnIndex();
+                }
+                
+                if(nome.equalsIgnoreCase("FORNECEDOR")){
+                    colForn = cell.getColumnIndex();
+                }
+                
+                if(nome.equalsIgnoreCase("PLACA")){
+                    colPlacaVeiculo = cell.getColumnIndex();
+                }
+                
+                if(nome.equalsIgnoreCase("DATA")){
+                    colData = cell.getColumnIndex();
                 }
             }
             if (colNota == -1 || colTotal == -1) {
@@ -52,6 +67,9 @@ public class Exportador_Excel {
                 
                 newRow.createCell(colNota).setCellValue(numNota);
                 newRow.createCell(colTotal).setCellValue(valorTotal);
+                newRow.createCell(colData).setCellValue(data);
+                newRow.createCell(colPlacaVeiculo).setCellValue(placaVeic);
+                newRow.createCell(colForn).setCellValue(forn);
                 
                 //escrita
                 LeituraByts.close();

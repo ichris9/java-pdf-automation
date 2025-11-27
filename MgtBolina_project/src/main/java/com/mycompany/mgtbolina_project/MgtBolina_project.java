@@ -26,7 +26,7 @@ public class MgtBolina_project {
            String data = coletor.ExtractDate(textoBruto);
            //String obra = coletor.ExtractObra(textoBruto);
            
-           List<String[]> itemsExtraidos = coletor.extractProductItens(textoBruto);
+           List<String[]> itemsExtraidos = coletor.extractItens(textoBruto);
            System.out.println("==========================");
            System.out.println(">>> DADOS DA NOTA <<<");
            System.out.println("==========================");
@@ -59,7 +59,7 @@ public class MgtBolina_project {
            
            String excelFilePath = "C:\\Users\\chris\\OneDrive\\Documents\\teste1.xlsx";
            
-           exporter.ExportDataTOExcel(excelFilePath, numNota, numTotal);
+           exporter.ExportDataTOExcel(excelFilePath, numNota, numTotal,data,placaVeiculo,razaoSocial);
         
        }
     }
