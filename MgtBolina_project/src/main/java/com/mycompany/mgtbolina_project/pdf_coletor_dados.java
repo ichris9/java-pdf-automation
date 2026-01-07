@@ -57,44 +57,6 @@ public class pdf_coletor_dados {
         
         return FindFistGroup(textoCompleto, regex);
     }
-    
-    
-    
-    //extração tabela de itens(retorna uma lsita)
-   public List<String[]> extractItens(String texto) {
-    List<String[]> itens = new ArrayList<>();
-    
-    // divide em linhas
-    String[] linhas = texto.split("\n");
-
-    for (String linha : linhas) {
-        // só linhas com muitos números têm produto
-        if (!linha.matches(".*\\d.*\\d.*\\d.*\\d.*"))
-            continue;
-
-        String[] partes = linha.trim().split("\\s+");
-
-        List<String> palavras = new ArrayList<>();
-        List<String> valores = new ArrayList<>();
-
-        for (String p : partes) {
-            if (p.contains(","))
-                valores.add(p);
-            else if (!p.matches("\\d+"))
-                palavras.add(p);
-        }
-
-        if (palavras.size() > 0 && valores.size() > 0) {
-            String descricao = String.join(" ", palavras);
-            String vUnit = valores.size() > 1 ? valores.get(valores.size() - 2) : "";
-            String vTotal = valores.get(valores.size() - 1);
-
-            itens.add(new String[]{descricao, vUnit, vTotal});
-        }
-    }
-
-    return itens;
-}
 
     
 }
