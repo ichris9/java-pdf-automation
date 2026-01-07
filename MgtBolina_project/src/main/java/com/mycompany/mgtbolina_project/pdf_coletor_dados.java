@@ -57,6 +57,10 @@ public class pdf_coletor_dados {
         
         return FindFistGroup(textoCompleto, regex);
     }
+    
+    
+    
+    
 
     
 }
