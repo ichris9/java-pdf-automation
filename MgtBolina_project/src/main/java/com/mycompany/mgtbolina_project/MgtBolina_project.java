@@ -1,3 +1,4 @@
+
 package com.mycompany.mgtbolina_project;
 
 import java.io.File;
@@ -19,7 +20,15 @@ public class MgtBolina_project {
        
        if(textoBruto != null){
          
+           // ===== DEBUG: Mostra primeiros 1500 caracteres do texto =====
+           System.out.println("\n========== TEXTO BRUTO (primeiros 1500 chars) ==========");
+           System.out.println(textoBruto.substring(0, Math.min(1500, textoBruto.length())));
+           System.out.println("========================================================\n");
+           
            pdf_coletor_dados coletor = new pdf_coletor_dados();
+           
+           // ===== DEBUG: Testa todas as extrações =====
+           coletor.debugExtraction(textoBruto);
            
            //texto bruto para extrair dados com regex
            String numNota = coletor.ExtractDanfeNumber(textoBruto);
@@ -27,7 +36,6 @@ public class MgtBolina_project {
            String placaVeiculo = coletor.ExtracPlacaVeiculo(textoBruto);
            String razaoSocial = coletor.ExtractRazaoSocial(textoBruto);
            String data = coletor.ExtractDate(textoBruto);
-           //String obra = coletor.ExtractObra(textoBruto);
            
           System.out.println("==========================");
            System.out.println(">>> DADOS DA NOTA <<<");
@@ -37,18 +45,22 @@ public class MgtBolina_project {
            System.out.println("Total da nota: "+ numTotal);
            System.out.println("Fornecedor: " + razaoSocial);
            System.out.println("Data: " + data);
-           System.out.println("teste tabela:" + listaDeProdutos);
+           System.out.println("\n>>> PRODUTOS ENCONTRADOS <<<");
+           System.out.println("Total de produtos: " + listaDeProdutos.size());
+           for (int i = 0; i < listaDeProdutos.size(); i++) {
+               produto p = listaDeProdutos.get(i);
+               System.out.println("  [" + (i+1) + "] " + p.descricao + " - R$ " + p.valorUnitario);
+           }
+           System.out.println("==========================\n");
           
-          System.out.print(textoBruto);
-           
-          
-              
            //exportar para excel
-           Exportador_Excel exporter = new Exportador_Excel();
-           
-           String excelFilePath = "C:\\Users\\chris\\OneDrive\\Documents\\teste1.xlsx";
-           
-           exporter.ExportDataTOExcel(excelFilePath, numNota, numTotal,data,placaVeiculo,razaoSocial,listaDeProdutos);
+           if (!listaDeProdutos.isEmpty()) {
+               Exportador_Excel exporter = new Exportador_Excel();
+               String excelFilePath = "C:\\Users\\chris\\OneDrive\\Documents\\teste1.xlsx";
+               exporter.ExportDataTOExcel(excelFilePath, numNota, numTotal, data, placaVeiculo, razaoSocial, listaDeProdutos);
+           } else {
+               System.err.println("AVISO: Nenhum produto foi encontrado. Excel não será atualizado.");
+           }
         
        }
     }
