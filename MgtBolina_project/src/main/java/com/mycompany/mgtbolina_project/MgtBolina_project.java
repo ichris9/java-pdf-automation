@@ -29,7 +29,7 @@ public class MgtBolina_project {
            String data = coletor.ExtractDate(textoBruto);
            //String obra = coletor.ExtractObra(textoBruto);
            
-           System.out.println("==========================");
+          System.out.println("==========================");
            System.out.println(">>> DADOS DA NOTA <<<");
            System.out.println("==========================");
            System.out.println("Numero da Nota: " + numNota);
@@ -38,7 +38,8 @@ public class MgtBolina_project {
            System.out.println("Fornecedor: " + razaoSocial);
            System.out.println("Data: " + data);
            System.out.println("teste tabela:" + listaDeProdutos);
-          // System.out.println("Obra: " + obra);
+          
+          System.out.print(textoBruto);
            
           
               

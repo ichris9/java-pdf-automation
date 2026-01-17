@@ -23,7 +23,7 @@ public class pdf_coletor_dados {
     
     
     public String ExtractDanfeNumber(String textoCompleto){
-       String regex = "[N \\n\\s+]([0-9\\.0-9]{7,8})";
+       String regex = "[Nº \\n\\s+].*?([0-9\\.0-9]{7,8})";
        
        return FindFistGroup(textoCompleto, regex);
     }
@@ -41,13 +41,13 @@ public class pdf_coletor_dados {
     }
     
     public String ExtractRazaoSocial(String textoCompleto){
-        String regex ="(?si)(?:DESTINAT[ÁA]RIO\\/REMETENTE)\n.*?(?:NOME RAZ[ÃA]O SOCIAL)\\n.*?([ A-Z ]+?(?:LTDA)+?)";
+        String regex ="NOME RAZ[ÃA]O SOCIAL \\n ([ A-Z] [1-9](?:LTDA))";
 
         return FindFistGroup(textoCompleto, regex);
     }
     
     public String ExtractDate(String TextCompleto){
-        String regex ="(?si)(?:DATA DE EMISSÃO|DATA DE SA[ÍI]DA\\/ENTRADA).*?([\\d]{2}\\/[\\d]{2}\\/[\\d]{4})";
+        String regex ="(?si)ENTRADA(^(0[1-9]|[12]\\d|3[01])\\/(0[1-9]|1[0-2])\\/\\d{4}$)";
         
         return FindFistGroup(TextCompleto, regex);
     }
