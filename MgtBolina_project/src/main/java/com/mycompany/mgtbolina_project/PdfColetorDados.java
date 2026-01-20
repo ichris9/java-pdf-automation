@@ -5,7 +5,7 @@ import java.util.regex.Pattern;
 import java.util.ArrayList;
 import java.util.List;
 
-public class pdf_coletor_dados {
+public class PdfColetorDados {
     
     // Normaliza caracteres com problemas de encoding
     private String normalizarTexto(String texto) {
@@ -58,10 +58,11 @@ public class pdf_coletor_dados {
             "NF-e[\\s\\|\\n]*N[ºÂ°]?[\\s\\|\\n]*S[eé]rie[\\s\\|\\n]*(\\d{3}\\.\\d{3})",
             "NF-e[\\s\\|\\n]*N[ºÂ°]?[\\s\\|\\n]*S[eé]rie[\\s\\|\\n]*(\\d{6,})",
             // Procura por "Série" seguido do número
-            "\\b(\\d{6,9})\\b",
+            "\\b(\\d{5,6})\\b",
             "S[eé]rie[\\s\\|\\n]+(\\d{6,})",
             // Padrão direto: pega número com 6-9 dígitos após "Nº" ou "NF-e"
-            "N[ºÂ°][\\s\\|\\n]+(\\d{6,9})",
+            "N[ºÂ°][\\s\\|\\n]+(\\d{6,5})",
+            "N[ºÂ°][\\s\\|\\n]+(\\d{5,4})",
             "NF-e[\\s\\|\\n]+N[ºÂ°]?[\\s\\|\\n]+(\\d{3}\\.\\d{3})",
             "NF-e[\\s\\|\\n]+N[ºÂ°]?[\\s\\|\\n]+(\\d{6,})",
             // Outros padrões comuns
@@ -81,10 +82,25 @@ public class pdf_coletor_dados {
     
     public String ExtractTotalNumber(String textoCompleto) {
         String[] patterns = {
+            //novos patterns
+            "VALOR\\s+TOTAL\\s+DA\\s+NOTA[\\s\\|\\n]+.*?(\\d{1,3}(?:\\.\\d{3})*,\\d{1,2})",
+            "(?:#1[ºÂ°o]:)\\s*(\\d{1,3}(?:\\.\\d{3})*,\\d{2})",
+            "VALOR\\s+TOTAL\\s+DOS\\s+PRODUTOS[\\s\\|\\n]+.*?(\\d{1,3}(?:\\.\\d{3})*,\\d{1,2})",
+            "VALOR\\s+TOTAL\\s+DA\\s+NOTA[\\s\\|\\n]+[,\\d\\s]+(\\d{1,3}(?:\\.\\d{3})*,\\d{2})",
+            "(?:#1º:)\\s*(\\d{1,3}(?:\\.\\d{3})*,\\d{2})",
+            "VALOR\\s+TOTAL\\s+DOS\\s+PRODUTOS[\\s\\|\\n]+[,\\d\\s]+(\\d{1,3}(?:\\.\\d{3})*,\\d{2})",
+            
+            //antigos
+            "VALOR\\s+TOTAL\\s+DA\\s+NOTA[\\s\\|\\n]+(\\d{1,3}(?:\\.\\d{3})*,\\d{2})",
+            "VLR\\.\\s+TOTAL\\.[\\s\\|\\n]+(\\d{1,3}(?:\\.\\d{3})*,\\d{2})",
             "VALOR\\s+TOTAL\\s+DA\\s+NOTA[^0-9]*(\\d{1,3}(?:\\.\\d{3})*,\\d{2})",
             "VALOR\\s+TOTAL\\s+DOS\\s+PRODUTOS[^0-9]*(\\d{1,3}(?:\\.\\d{3})*,\\d{2})",
             "TOTAL\\s+(?:DA\\s+)?NOTA[^0-9]*(\\d{1,3}(?:\\.\\d{3})*,\\d{2})",
-            "VALOR\\s+TOTAL[^0-9]*(\\d{1,3}(?:\\.\\d{3})*,\\d{2})"
+            "VALOR\\s+TOTAL[^0-9]*(\\d{1,3}(?:\\.\\d{3})*,\\d{2})",
+            "TOTAL\\s[^0-9]*(\\d{1,3}(?:\\.\\d{3})*,\\d{2})",
+            "VALOR\\s+TOTAL\\s+DOS\\s+PRODUTOS\\n\\s[^0-9]*(\\d{1,3}(?:\\.\\d{3})*,\\d{2})",
+            
+                
         };
         
         return extractWithMultiplePatterns(textoCompleto, patterns);
@@ -104,6 +120,9 @@ public class pdf_coletor_dados {
     
     public String ExtractRazaoSocial(String textoCompleto) {
         String[] patterns = {
+            //novos
+            "RECEBEMOS\\s+DE\\s+\\d*\\s*([A-Z0-9][A-Z0-9\\s&.-]+?(?:LTDA|ME|EPP|EIRELI|S\\.?A\\.?))",
+            "RECEBEMOS\\s+DE\\s+([A-Z0-9][A-Z\\s&.-]+?(?:LTDA|ME|EPP|EIRELI|S\\.?A\\.?))",
             // Padrão para pegar "JULIO JULIO MINERACAO LTDA" que aparece logo após o número da nota
             "\\d{3}\\.\\d{3}[\\s\\n]+\\d+[\\s\\n]+([A-Z][A-Z\\s&.-]+(?:LTDA|ME|EPP|EIRELI|S\\.?A\\.?|LTDA\\.?))",
             // Outros padrões
@@ -128,6 +147,14 @@ public class pdf_coletor_dados {
     
     public String ExtractDate(String textoCompleto) {
         String[] patterns = {
+            //novos
+            "(\\d{2}/\\d{2}/\\d{4})\\s+\\d{2}:\\d{2}:\\d{2}\\s+-\\d{2}:\\d{2}\\s+[\\s\\S]*?DATA\\s*/?HORA\\s*/?UTC\\s+DE\\s+SA[IÍ]DA",
+            "\\d{2}/\\d{2}/\\d{4}(?=\\s+\\d{2}:\\d{2}:\\d{2})",
+            "[D]?ATA\\s*/\\s*HORA\\s*/\\s*UTC\\s+DE\\s+SA[IÃ]DA[\\s\\|\\n]+(\\d{2}/\\d{2}/\\d{4})",
+            "EMISS[ÃƒÆ'AÃƒÃ]O[\\s\\|\\n]+(\\d{2}/\\d{2}/\\d{4})",
+            "ATA/HORA/UTC\\s+DE\\s+SA[IÍ]DA\\s+(\\d{2}/\\d{2}/\\d{4})",
+            "DATA/HORA/UTC\\s+DE\\s+SA[IÍ]DA\\s+(\\d{2}/\\d{2}/\\d{4})",
+            "EMISS[ÃƒAÃ]O[\\s\\|\\n]+(\\d{2}/\\d{2}/\\d{4})",
             // Padrão específico que aparece no seu PDF: "17/10/2025" próximo a outras coisas
             "(\\d{2}/\\d{2}/\\d{4})",
             // Padrão para data de emissão
@@ -139,7 +166,10 @@ public class pdf_coletor_dados {
             "DATA[\\s\\|]*(\\d{2}/\\d{2}/\\d{4})",
             // Formato com traço
             "DATA\\s+DE\\s+EMISS[ÃA]O[\\s\\|]*(\\d{2}-\\d{2}-\\d{4})",
-            "(\\d{2}-\\d{2}-\\d{4})"
+            "(\\d{2}-\\d{2}-\\d{4})",
+            //formato com data e hora
+            "DATA\\s*/\\s*HORA\\s*/\\s*UTC\\s+DE\\s+EMISS[ÃƒA]O[\\s\\|\\n]+(\\d{2}/\\d{2}/\\d{4})",
+                
         };
         
         String resultado = extractWithMultiplePatterns(textoCompleto, patterns);

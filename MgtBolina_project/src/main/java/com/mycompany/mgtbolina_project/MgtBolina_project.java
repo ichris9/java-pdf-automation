@@ -6,16 +6,16 @@ import java.util.List;
 
 public class MgtBolina_project {
     public static void main(String[] args) {
-       File pdfFile = new File("C:\\Users\\chris\\Downloads\\danfe - 858111.PDF");
+       File pdfFile = new File("C:\\Users\\chris\\Downloads\\43730_1_2.PDF");
         
        //lê o pdf
-       Pdf_Leitor leitor = new Pdf_Leitor();
+       PdfLeitor leitor = new PdfLeitor();
        
        //pega todo o texto o pdf
        String textoBruto = leitor.ExtractText(pdfFile.getAbsolutePath());
        
-       coletor_produtos_tabulaJava coletorTabula = new coletor_produtos_tabulaJava();
-       List<produto> listaDeProdutos = coletorTabula.extrairTabelaPDF(pdfFile.getAbsolutePath());
+       ColetorProdutos coletorTabula = new ColetorProdutos();
+       List<Produto> listaDeProdutos = coletorTabula.extrairTabelaPDF(pdfFile.getAbsolutePath());
         
        
        if(textoBruto != null){
@@ -25,7 +25,7 @@ public class MgtBolina_project {
            System.out.println(textoBruto.substring(0, Math.min(1500, textoBruto.length())));
            System.out.println("========================================================\n");
            
-           pdf_coletor_dados coletor = new pdf_coletor_dados();
+           PdfColetorDados coletor = new PdfColetorDados();
            
            // ===== DEBUG: Testa todas as extrações =====
            coletor.debugExtraction(textoBruto);
@@ -48,14 +48,14 @@ public class MgtBolina_project {
            System.out.println("\n>>> PRODUTOS ENCONTRADOS <<<");
            System.out.println("Total de produtos: " + listaDeProdutos.size());
            for (int i = 0; i < listaDeProdutos.size(); i++) {
-               produto p = listaDeProdutos.get(i);
+               Produto p = listaDeProdutos.get(i);
                System.out.println("  [" + (i+1) + "] " + p.descricao + " - R$ " + p.valorUnitario);
            }
            System.out.println("==========================\n");
           
            //exportar para excel
            if (!listaDeProdutos.isEmpty()) {
-               Exportador_Excel exporter = new Exportador_Excel();
+               ExportadorExcel exporter = new ExportadorExcel();
                String excelFilePath = "C:\\Users\\chris\\OneDrive\\Documents\\teste1.xlsx";
                exporter.ExportDataTOExcel(excelFilePath, numNota, numTotal, data, placaVeiculo, razaoSocial, listaDeProdutos);
            } else {

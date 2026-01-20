@@ -12,7 +12,7 @@ import java.io.File;
 import java.util.List;
 import technology.tabula.RectangularTextContainer;
 
-public class Pdf_Leitor {
+public class PdfLeitor {
     
     public String ExtractText(String filePath){
         StringBuilder textoCompleto = new StringBuilder();

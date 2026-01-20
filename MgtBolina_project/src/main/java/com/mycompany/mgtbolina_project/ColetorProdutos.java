@@ -15,10 +15,10 @@ import java.util.regex.Pattern;
 import java.util.regex.Matcher;
 import org.apache.pdfbox.Loader;
 
-public class coletor_produtos_tabulaJava {
+public class ColetorProdutos {
     
-    public List<produto> extrairTabelaPDF(String caminhoPDF) {
-        List<produto> listaDeProdutos = new ArrayList<>();
+    public List<Produto> extrairTabelaPDF(String caminhoPDF) {
+        List<Produto> listaDeProdutos = new ArrayList<>();
         
         try (PDDocument doc = Loader.loadPDF(new File(caminhoPDF))) {
             ObjectExtractor extractor = new ObjectExtractor(doc);
@@ -28,7 +28,7 @@ public class coletor_produtos_tabulaJava {
                 Page pagina = extractor.extract(pageNum);
                 
                 // Tentar ambos os algoritmos
-                List<produto> produtosDaPagina = tentarExtracao(pagina);
+                List<Produto> produtosDaPagina = tentarExtracao(pagina);
                 listaDeProdutos.addAll(produtosDaPagina);
             }
             
@@ -42,8 +42,8 @@ public class coletor_produtos_tabulaJava {
         return listaDeProdutos;
     }
     
-    private List<produto> tentarExtracao(Page pagina) {
-        List<produto> produtos = new ArrayList<>();
+    private List<Produto> tentarExtracao(Page pagina) {
+        List<Produto> produtos = new ArrayList<>();
         
         // Primeiro tenta com SpreadsheetExtractionAlgorithm
         produtos = extrairComSpreadsheet(pagina);
@@ -56,8 +56,8 @@ public class coletor_produtos_tabulaJava {
         return produtos;
     }
     
-    private List<produto> extrairComSpreadsheet(Page pagina) {
-        List<produto> produtos = new ArrayList<>();
+    private List<Produto> extrairComSpreadsheet(Page pagina) {
+        List<Produto> produtos = new ArrayList<>();
         SpreadsheetExtractionAlgorithm algoritmo = new SpreadsheetExtractionAlgorithm();
         List<Table> tabelas = algoritmo.extract(pagina);
         
@@ -68,8 +68,8 @@ public class coletor_produtos_tabulaJava {
         return produtos;
     }
     
-    private List<produto> extrairComBasic(Page pagina) {
-        List<produto> produtos = new ArrayList<>();
+    private List<Produto> extrairComBasic(Page pagina) {
+        List<Produto> produtos = new ArrayList<>();
         BasicExtractionAlgorithm algoritmo = new BasicExtractionAlgorithm();
         List<Table> tabelas = algoritmo.extract(pagina);
         
@@ -80,8 +80,8 @@ public class coletor_produtos_tabulaJava {
         return produtos;
     }
     
-    private List<produto> processarTabela(Table tabela) {
-        List<produto> produtos = new ArrayList<>();
+    private List<Produto> processarTabela(Table tabela) {
+        List<Produto> produtos = new ArrayList<>();
         
         if (tabela.getRows().isEmpty()) {
             return produtos;
@@ -109,39 +109,26 @@ public class coletor_produtos_tabulaJava {
                 continue;
             }
             
-            // CASO ESPECIAL: Se toda a linha está em uma única célula, precisa fazer parse manual
-            if (linha.size() == 1 || linha.size() <= 5) {
-                String linhaCompleta = linha.get(0).getText().trim();
-                
-                // Tenta fazer parse da linha concatenada
-                produto p = parsearLinhaConcatenada(linhaCompleta);
-                if (p != null) {
-                    produtos.add(p);
-                    System.out.println("✓ PRODUTO ADICIONADO (parse manual): " + p.descricao + " | R$ " + p.valorUnitario);
-                }
+            // Concatena toda a linha para análise
+            StringBuilder linhaCompleta = new StringBuilder();
+            for (RectangularTextContainer cell : linha) {
+                linhaCompleta.append(cell.getText().trim()).append(" ");
+            }
+            String textoLinha = linhaCompleta.toString().trim();
+            
+            System.out.println("\n[Linha " + linhaNum + "] Analisando: " + textoLinha);
+            
+            // Ignora linhas vazias
+            if (textoLinha.isEmpty() || textoLinha.length() < 10) {
+                System.out.println("  -> Rejeitado: linha muito curta");
                 continue;
             }
             
-            // Processa normalmente se tem colunas separadas
-            int[] indices = identificarColunas(tabela);
-            int colCodigo = indices[0];
-            int colDescricao = indices[1];
-            int colValorUnit = indices[2];
-            
-            // Verifica se a linha tem colunas suficientes
-            if (linha.size() <= Math.max(colDescricao, colValorUnit)) {
-                continue;
-            }
-            
-            // Pega os dados da linha
-            String codigo = colCodigo != -1 && colCodigo < linha.size() ? linha.get(colCodigo).getText().trim() : "";
-            String descricao = colDescricao < linha.size() ? linha.get(colDescricao).getText().trim() : "";
-            String valorUnitario = colValorUnit != -1 && colValorUnit < linha.size() ? linha.get(colValorUnit).getText().trim() : "";
-            
-            // FILTROS IMPORTANTES: só adiciona se for realmente um produto
-            if (isProdutoValido(codigo, descricao, valorUnitario)) {
-                produtos.add(new produto(descricao, limparValor(valorUnitario)));
-                System.out.println("✓ PRODUTO ADICIONADO: " + descricao + " | R$ " + valorUnitario);
+            // Tenta fazer parse da linha
+            Produto p = parsearLinhaConcatenada(textoLinha);
+            if (p != null) {
+                produtos.add(p);
+                System.out.println("  -> ✓ PRODUTO ADICIONADO: " + p.descricao + " | R$ " + p.valorUnitario);
             }
         }
         
@@ -151,10 +138,8 @@ public class coletor_produtos_tabulaJava {
         return produtos;
     }
     
-    // Novo método para parsear linha concatenada
-    private produto parsearLinhaConcatenada(String linha) {
-        // Exemplo: "4776 BICA FINA DE GRANITO 25171000 000  5.101 TON 38,420 50,00  1.921,00"
-        
+    // Método aprimorado para parsear linha concatenada
+    private Produto parsearLinhaConcatenada(String linha) {
         // Remove espaços múltiplos
         linha = linha.replaceAll("\\s+", " ").trim();
         
@@ -171,92 +156,75 @@ public class coletor_produtos_tabulaJava {
         if (linhaUpper.contains("CÓD") || linhaUpper.contains("DESCRIÇÃO") ||
             linhaUpper.contains("DADOS") || linhaUpper.contains("CÁLCULO") ||
             linhaUpper.contains("INFORMAÇÕES") || linhaUpper.contains("ALIQUOTA") ||
-            linhaUpper.contains("ISSQN") || linhaUpper.contains("RESERVADO")) {
+            linhaUpper.contains("ISSQN") || linhaUpper.contains("RESERVADO") ||
+            linhaUpper.contains("BASE DE") || linhaUpper.contains("VALOR DO") ||
+            linhaUpper.contains("COMPLEMENTARES")) {
             System.out.println("  [Rejeitado]: é cabeçalho ou informação adicional");
             return null;
         }
         
-        // Tenta extrair usando regex mais flexível:
-        // Padrão: começa com números (código), seguido de texto (descrição), depois valores monetários
-        // Procura especificamente por dois valores monetários: V.UNIT e V.TOTAL
-        Pattern pattern = Pattern.compile("^(\\d+)\\s+([A-ZÀ-Ú][A-ZÀ-Úa-zà-ú\\s]+?)\\s+\\d+.*?(\\d{1,3}(?:\\.\\d{3})*,\\d{2})\\s+(\\d{1,3}(?:\\.\\d{3})*,\\d{2})");
-        Matcher matcher = pattern.matcher(linha);
+        // REGEX MELHORADO: Captura código, descrição e valores monetários
+        // Padrão: CÓDIGO DESCRIÇÃO NCM CST CFOP UNID QUANT V.UNIT V.TOTAL ...
+        // Exemplo: "4776 BICA FINA DE GRANITO 25171000 000 5.101 TON 38,420 50,00 1.921,00"
         
-        if (matcher.find()) {
-            String codigo = matcher.group(1);
-            String descricao = matcher.group(2).trim();
-            String valorUnit = matcher.group(3);
-            String valorTotal = matcher.group(4);
+        // Padrão 1: Mais específico para DANFEs (com NCM, CST, CFOP)
+        Pattern pattern1 = Pattern.compile(
+            "^(\\d+)\\s+" +                                    // Código do produto
+            "([A-ZÀ-Ú][A-ZÀ-Úa-zà-ú0-9\\s/\\-\\.]+?)\\s+"+     // Descrição
+            "\\d{8}\\s+" +                                      // NCM
+            "\\d{3}\\s+" +                                      // CST
+            "[\\d\\.]+\\s+" +                                   // CFOP
+            "[A-Z]+\\s+" +                                      // UNID
+            "[\\d,]+\\s+" +                                     // QUANT
+            "(\\d{1,3}(?:\\.\\d{3})*,\\d{2})\\s+" +           // V.UNIT
+            "(\\d{1,3}(?:\\.\\d{3})*,\\d{2})"                 // V.TOTAL
+        );
+        
+        // Padrão 2: Mais flexível (caso o padrão 1 não funcione)
+        Pattern pattern2 = Pattern.compile(
+            "^(\\d+)\\s+" +                                    // Código
+            "([A-ZÀ-Ú][A-ZÀ-Úa-zà-ú0-9\\s/\\-\\.]+?)\\s+" +     // Descrição
+            ".*?" +                                             // Tudo no meio
+            "(\\d{1,3}(?:\\.\\d{3})*,\\d{2})\\s+" +           // Penúltimo valor (V.UNIT)
+            "(\\d{1,3}(?:\\.\\d{3})*,\\d{2})"                 // Último valor (V.TOTAL)
+        );
+        
+        Matcher matcher1 = pattern1.matcher(linha);
+        Matcher matcher2 = pattern2.matcher(linha);
+        
+        Matcher matcherFinal = null;
+        if (matcher1.find()) {
+            matcherFinal = matcher1;
+            System.out.println("  [Match com padrão específico DANFE!]");
+        } else if (matcher2.find()) {
+            matcherFinal = matcher2;
+            System.out.println("  [Match com padrão flexível!]");
+        }
+        
+        if (matcherFinal != null) {
+            String codigo = matcherFinal.group(1);
+            String descricao = matcherFinal.group(2).trim();
+            String valorUnit = matcherFinal.group(3);
+            String valorTotal = matcherFinal.group(4);
             
-            System.out.println("  [Match encontrado!]");
+            System.out.println("  [Dados capturados:]");
             System.out.println("    Código: " + codigo);
             System.out.println("    Descrição: " + descricao);
             System.out.println("    V.Unit: " + valorUnit);
             System.out.println("    V.Total: " + valorTotal);
             
             // Valida se parece um produto real
-            if (descricao.length() > 3 && !descricao.matches("^\\d+$") && descricao.matches(".*[A-Za-z]+.*")) {
+            if (isProdutoValido(codigo, descricao, valorUnit)) {
                 System.out.println("  [PRODUTO VÁLIDO!]");
-                return new produto(descricao, valorUnit);
+                return new Produto(descricao, valorUnit);
             } else {
-                System.out.println("  [Rejeitado]: descrição inválida");
+                System.out.println("  [Rejeitado]: validação falhou");
             }
         } else {
-            System.out.println("  [Rejeitado]: não deu match na regex");
+            System.out.println("  [Rejeitado]: não deu match em nenhum padrão regex");
         }
         
         return null;
-    }
-    
-    private int[] identificarColunas(Table tabela) {
-        int colCodigo = -1;
-        int colDescricao = -1;
-        int colValorUnit = -1;
-        int colValorTotal = -1;
-        
-        // Procura pelo cabeçalho "DADOS DO PRODUTO / SERVIÇOS"
-        for (List<RectangularTextContainer> linha : tabela.getRows()) {
-            for (int i = 0; i < linha.size(); i++) {
-                String texto = linha.get(i).getText().trim().toUpperCase();
-                
-                // Procura coluna de código
-                if ((texto.contains("CÓD") || texto.equals("COD") || 
-                     texto.contains("CODIGO")) && colCodigo == -1) {
-                    colCodigo = i;
-                }
-                
-                // Procura coluna de descrição
-                if ((texto.contains("DESCRI") || texto.contains("PRODUTO")) && colDescricao == -1) {
-                    colDescricao = i;
-                }
-                
-                // Procura coluna de valor unitário
-                if ((texto.contains("V. UNIT") || texto.contains("VL. UNIT") || 
-                     texto.contains("VALOR UNIT")) && colValorUnit == -1) {
-                    colValorUnit = i;
-                }
-                
-                // Procura coluna de valor total
-                if ((texto.contains("V. TOTAL") || texto.contains("VL. TOTAL") || 
-                     texto.contains("VALOR TOTAL")) && colValorTotal == -1) {
-                    colValorTotal = i;
-                }
-            }
-            
-            // Se encontrou as colunas principais, para de procurar
-            if (colDescricao != -1 && colValorUnit != -1) {
-                break;
-            }
-        }
-        
-        // Valores padrão baseados na estrutura comum das DANFEs
-        // Estrutura: CÓD | DESCRIÇÃO | NCM | CST | CFOP | UNID | QUANT | V.UNIT | V.TOTAL ...
-        if (colCodigo == -1) colCodigo = 0;
-        if (colDescricao == -1) colDescricao = 1;
-        if (colValorUnit == -1) colValorUnit = 7;  // Geralmente V.UNIT está na coluna 7
-        if (colValorTotal == -1) colValorTotal = 8;  // V.TOTAL na coluna 8
-        
-        return new int[]{colCodigo, colDescricao, colValorUnit, colValorTotal};
     }
     
     private boolean temCabecalhoProdutos(List<RectangularTextContainer> linha) {
@@ -269,6 +237,7 @@ public class coletor_produtos_tabulaJava {
             if (texto.contains("DADOS DO PRODUTO") || 
                 texto.contains("DESCRIÇÃO DO PRODUTO") ||
                 texto.contains("DADOS DOS PRODUTOS") ||
+                texto.contains("DADOS DO SERVIÇO") ||
                 (texto.contains("CÓD") && texto.contains("PRODUTO"))) {
                 System.out.println(">>> Cabeçalho detectado pela célula: " + texto);
                 return true;
@@ -277,7 +246,8 @@ public class coletor_produtos_tabulaJava {
         
         // Também procura na linha completa
         String linhaStr = linhaCompleta.toString();
-        if (linhaStr.contains("CÓD") && linhaStr.contains("DESCRIÇÃO") && linhaStr.contains("PRODUTO")) {
+        if ((linhaStr.contains("CÓD") || linhaStr.contains("PRODUTO")) && 
+            (linhaStr.contains("DESCRIÇÃO") || linhaStr.contains("SERVIÇO"))) {
             System.out.println(">>> Cabeçalho detectado pela linha completa");
             return true;
         }
@@ -291,45 +261,52 @@ public class coletor_produtos_tabulaJava {
         
         // 1. Descrição não pode estar vazia
         if (descricao == null || descricao.isEmpty()) {
+            System.out.println("    ✗ Descrição vazia");
             return false;
         }
         
         // 2. Descrição NÃO pode ser apenas números (isso seria o código)
         if (descricao.matches("^\\d+$")) {
-            System.out.println("❌ Rejeitado (só código): " + descricao);
+            System.out.println("    ✗ Descrição é só código: " + descricao);
             return false;
         }
         
-        // 3. Não pode ser cabeçalho
+        // 3. Não pode ser cabeçalho ou informação administrativa
         String descUpper = descricao.toUpperCase();
         if (descUpper.contains("DESCRIÇÃO") || descUpper.contains("DESCRICAO") ||
-            descUpper.contains("PRODUTO") || descUpper.contains("CÓD") ||
-            descUpper.contains("NCM") || descUpper.contains("CFOP") ||
-            descUpper.contains("DADOS DO") || descUpper.contains("SERVIÇOS") ||
-            descUpper.contains("IDENTIFICAÇÃO") || descUpper.contains("ASSINATURA") ||
-            descUpper.contains("RECEPTOR") || descUpper.contains("RECOLHIMENTO") ||
-            descUpper.contains("ESTADUAL") || descUpper.contains("TRIBUTÁRIO") ||
-            descUpper.contains("MUNICÍPIO") || descUpper.contains("ENDEREÇO") ||
-            descUpper.contains("ESPÉCIE") || descUpper.contains("MARCA") ||
-            descUpper.contains("ALIQ") || descUpper.contains("CST")) {
+            descUpper.contains("CÓD") || descUpper.contains("NCM") || 
+            descUpper.contains("CFOP") || descUpper.contains("DADOS DO") || 
+            descUpper.contains("SERVIÇOS") || descUpper.contains("IDENTIFICAÇÃO") || 
+            descUpper.contains("ASSINATURA") || descUpper.contains("RECEPTOR") || 
+            descUpper.contains("RECOLHIMENTO") || descUpper.contains("ESTADUAL") || 
+            descUpper.contains("TRIBUTÁRIO") || descUpper.contains("MUNICÍPIO") || 
+            descUpper.contains("ENDEREÇO") || descUpper.contains("ESPÉCIE") || 
+            descUpper.contains("MARCA") || descUpper.contains("ALIQ") || 
+            descUpper.contains("CST") || descUpper.contains("BASE DE") ||
+            descUpper.contains("VALOR DO") || descUpper.contains("COMPLEMENTARES")) {
+            System.out.println("    ✗ Contém palavra de cabeçalho");
             return false;
         }
         
         // 4. Valor unitário precisa ser um número válido
         if (valorUnitario == null || valorUnitario.isEmpty()) {
+            System.out.println("    ✗ Valor unitário vazio");
             return false;
         }
         
         String valorLimpo = limparValor(valorUnitario);
         if (!valorLimpo.matches("\\d+,\\d{2}") && !valorLimpo.matches("\\d+\\.\\d+,\\d{2}")) {
+            System.out.println("    ✗ Valor unitário inválido: " + valorLimpo);
             return false;
         }
         
-        // 5. Descrição precisa ter mais de 3 caracteres E conter letras
-        if (descricao.length() < 4 || !descricao.matches(".*[A-Za-z]+.*")) {
+        // 5. Descrição precisa ter mais de 2 caracteres E conter letras
+        if (descricao.length() < 3 || !descricao.matches(".*[A-Za-z]+.*")) {
+            System.out.println("    ✗ Descrição muito curta ou sem letras");
             return false;
         }
         
+        System.out.println("    ✓ Produto válido!");
         return true;
     }
     
@@ -343,12 +320,12 @@ public class coletor_produtos_tabulaJava {
         if (texto == null) return null;
         
         return texto
-            .replace("Ã§", "ç")
-            .replace("Ã£", "ã")
-            .replace("Ã©", "é")
-            .replace("Ã­", "í")
-            .replace("Ã³", "ó")
-            .replace("Ãº", "ú")
+            .replace("ÃÂ§", "ç")
+            .replace("ÃÂ£", "ã")
+            .replace("ÃÂ©", "é")
+            .replace("ÃÂ­", "í")
+            .replace("ÃÂ³", "ó")
+            .replace("ÃÂº", "ú")
             .replace("Ã ", "à")
             .replace("Ã‡", "Ç")
             .replace("ÃƒO", "ÃO")

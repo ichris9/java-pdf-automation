@@ -10,11 +10,11 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
-public class Exportador_Excel {
+public class ExportadorExcel {
     
     public void ExportDataTOExcel(String filePath, String numNota, String valorTotal, 
                                    String data, String placaVeic, String forn, 
-                                   List<produto> listaDeProdutos) {
+                                   List<Produto> listaDeProdutos) {
         
         FileInputStream leituraBytes = null;
         FileOutputStream outputStream = null;
@@ -85,7 +85,7 @@ public class Exportador_Excel {
             
             // Escreve os dados
             int linhasAdicionadas = 0;
-            for (produto p : listaDeProdutos) {
+            for (Produto p : listaDeProdutos) {
                 int proximaLinhaVazia = sheet.getLastRowNum() + 1;
                 Row row = sheet.createRow(proximaLinhaVazia);
                 
