@@ -12,16 +12,16 @@ public class PdfColetorDados {
         if (texto == null) return null;
         
         return texto
-            .replace("Ã§", "ç")
-            .replace("Ã£", "ã")
-            .replace("Ã©", "é")
-            .replace("Ã­", "í")
-            .replace("Ã³", "ó")
-            .replace("Ãº", "ú")
-            .replace("Ã ", "à")
-            .replace("Ã‡", "Ç")
-            .replace("ÃƒO", "ÃO")
-            .replace("Ãƒ", "Ã");
+            .replace("ÃƒÂ§", "ç")
+            .replace("ÃƒÂ£", "ã")
+            .replace("ÃƒÂ©", "é")
+            .replace("ÃƒÂ­", "í")
+            .replace("ÃƒÂ³", "ó")
+            .replace("ÃƒÂº", "ú")
+            .replace("Ãƒ ", "à")
+            .replace("Ãƒâ€¡", "Ç")
+            .replace("ÃƒÆ'O", "ÃO")
+            .replace("ÃƒÆ'", "Ã");
     }
     
     private String FindFirstGroup(String text, String regex) {
@@ -29,30 +29,55 @@ public class PdfColetorDados {
             return null;
         }
         
-        // Normaliza o texto antes de processar
-        text = normalizarTexto(text);
-        
-        Pattern pattern = Pattern.compile(regex, Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
-        Matcher matcher = pattern.matcher(text);
-        
-        if (matcher.find()) {
-            String resultado = matcher.group(1).trim();
-            return normalizarTexto(resultado);
+        try {
+            // Normaliza o texto antes de processar
+            text = normalizarTexto(text);
+            
+            Pattern pattern = Pattern.compile(regex, Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+            Matcher matcher = pattern.matcher(text);
+            
+            if (matcher.find()) {
+                // PROTEÇÃO: Verifica se o grupo 1 existe antes de acessá-lo
+                if (matcher.groupCount() >= 1) {
+                    String resultado = matcher.group(1);
+                    if (resultado != null) {
+                        resultado = resultado.trim();
+                        return normalizarTexto(resultado);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Erro ao processar regex: " + regex);
+            System.err.println("Mensagem: " + e.getMessage());
         }
+        
         return null;
     }
     
     private String extractWithMultiplePatterns(String text, String[] patterns) {
+        if (text == null || text.isEmpty()) {
+            return "Não Encontrado (N/E)";
+        }
+        
         for (String regex : patterns) {
-            String result = FindFirstGroup(text, regex);
-            if (result != null && !result.isEmpty()) {
-                return result;
+            try {
+                String result = FindFirstGroup(text, regex);
+                if (result != null && !result.isEmpty()) {
+                    return result;
+                }
+            } catch (Exception e) {
+                System.err.println("Erro ao tentar padrão: " + regex);
+                // Continua para o próximo padrão
             }
         }
         return "Não Encontrado (N/E)";
     }
     
     public String ExtractDanfeNumber(String textoCompleto) {
+        if (textoCompleto == null || textoCompleto.isEmpty()) {
+            return "Não Encontrado (N/E)";
+        }
+        
         String[] patterns = {
             // Padrão com pipe e quebras de linha (como vem do Tabula)
             "NF-e[\\s\\|\\n]*N[ºÂ°]?[\\s\\|\\n]*S[eé]rie[\\s\\|\\n]*(\\d{3}\\.\\d{3})",
@@ -81,6 +106,10 @@ public class PdfColetorDados {
     }
     
     public String ExtractTotalNumber(String textoCompleto) {
+        if (textoCompleto == null || textoCompleto.isEmpty()) {
+            return "Não Encontrado (N/E)";
+        }
+        
         String[] patterns = {
             //novos patterns
             "VALOR\\s+TOTAL\\s+DA\\s+NOTA[\\s\\|\\n]+.*?(\\d{1,3}(?:\\.\\d{3})*,\\d{1,2})",
@@ -99,14 +128,16 @@ public class PdfColetorDados {
             "VALOR\\s+TOTAL[^0-9]*(\\d{1,3}(?:\\.\\d{3})*,\\d{2})",
             "TOTAL\\s[^0-9]*(\\d{1,3}(?:\\.\\d{3})*,\\d{2})",
             "VALOR\\s+TOTAL\\s+DOS\\s+PRODUTOS\\n\\s[^0-9]*(\\d{1,3}(?:\\.\\d{3})*,\\d{2})",
-            
-                
         };
         
         return extractWithMultiplePatterns(textoCompleto, patterns);
     }
     
     public String ExtracPlacaVeiculo(String textoCompleto) {
+        if (textoCompleto == null || textoCompleto.isEmpty()) {
+            return "Não Encontrado (N/E)";
+        }
+        
         String[] patterns = {
             "PLACA\\s+DO\\s+VE[ÍI]CULO[^A-Z0-9]*(\\w{7})",  // Pega GIL7F05
             "PLACA\\s+DO\\s+VE[ÍI]CULO[^A-Z0-9]*([A-Z]{3}[-\\s]?\\d[A-Z0-9]\\d{2})",
@@ -119,6 +150,10 @@ public class PdfColetorDados {
     }
     
     public String ExtractRazaoSocial(String textoCompleto) {
+        if (textoCompleto == null || textoCompleto.isEmpty()) {
+            return "Não Encontrado (N/E)";
+        }
+        
         String[] patterns = {
             //novos
             "RECEBEMOS\\s+DE\\s+\\d*\\s*([A-Z0-9][A-Z0-9\\s&.-]+?(?:LTDA|ME|EPP|EIRELI|S\\.?A\\.?))",
@@ -146,15 +181,19 @@ public class PdfColetorDados {
     }
     
     public String ExtractDate(String textoCompleto) {
+        if (textoCompleto == null || textoCompleto.isEmpty()) {
+            return "Não Encontrado (N/E)";
+        }
+        
         String[] patterns = {
             //novos
             "(\\d{2}/\\d{2}/\\d{4})\\s+\\d{2}:\\d{2}:\\d{2}\\s+-\\d{2}:\\d{2}\\s+[\\s\\S]*?DATA\\s*/?HORA\\s*/?UTC\\s+DE\\s+SA[IÍ]DA",
             "\\d{2}/\\d{2}/\\d{4}(?=\\s+\\d{2}:\\d{2}:\\d{2})",
-            "[D]?ATA\\s*/\\s*HORA\\s*/\\s*UTC\\s+DE\\s+SA[IÃ]DA[\\s\\|\\n]+(\\d{2}/\\d{2}/\\d{4})",
-            "EMISS[ÃƒÆ'AÃƒÃ]O[\\s\\|\\n]+(\\d{2}/\\d{2}/\\d{4})",
+            "[D]?ATA\\s*/\\s*HORA\\s*/\\s*UTC\\s+DE\\s+SA[IÍA]DA[\\s\\|\\n]+(\\d{2}/\\d{2}/\\d{4})",
+            "EMISS[ÃA]O[\\s\\|\\n]+(\\d{2}/\\d{2}/\\d{4})",
             "ATA/HORA/UTC\\s+DE\\s+SA[IÍ]DA\\s+(\\d{2}/\\d{2}/\\d{4})",
             "DATA/HORA/UTC\\s+DE\\s+SA[IÍ]DA\\s+(\\d{2}/\\d{2}/\\d{4})",
-            "EMISS[ÃƒAÃ]O[\\s\\|\\n]+(\\d{2}/\\d{2}/\\d{4})",
+            "EMISS[ÃA]O[\\s\\|\\n]+(\\d{2}/\\d{2}/\\d{4})",
             // Padrão específico que aparece no seu PDF: "17/10/2025" próximo a outras coisas
             "(\\d{2}/\\d{2}/\\d{4})",
             // Padrão para data de emissão
@@ -168,8 +207,7 @@ public class PdfColetorDados {
             "DATA\\s+DE\\s+EMISS[ÃA]O[\\s\\|]*(\\d{2}-\\d{2}-\\d{4})",
             "(\\d{2}-\\d{2}-\\d{4})",
             //formato com data e hora
-            "DATA\\s*/\\s*HORA\\s*/\\s*UTC\\s+DE\\s+EMISS[ÃƒA]O[\\s\\|\\n]+(\\d{2}/\\d{2}/\\d{4})",
-                
+            "DATA\\s*/\\s*HORA\\s*/\\s*UTC\\s+DE\\s+EMISS[ÃA]O[\\s\\|\\n]+(\\d{2}/\\d{2}/\\d{4})",
         };
         
         String resultado = extractWithMultiplePatterns(textoCompleto, patterns);
@@ -183,6 +221,10 @@ public class PdfColetorDados {
     }
     
     public String ExtractObra(String textoCompleto) {
+        if (textoCompleto == null || textoCompleto.isEmpty()) {
+            return "Não Encontrado (N/E)";
+        }
+        
         String[] patterns = {
             "OBRA[^\\n:]*[:\\-]?\\s*([A-Z0-9][A-Z0-9\\s.-]+)",
             "DESTINO[^\\n:]*[:\\-]?\\s*([A-Z0-9][A-Z0-9\\s.-]+)",
@@ -194,33 +236,50 @@ public class PdfColetorDados {
     
     // Método alternativo: extrai número procurando no texto bruto
     public String ExtractDanfeNumberSimples(String textoCompleto) {
-        // Procura por sequência de 6-9 dígitos que pode ser a nota
-        // Geralmente aparece após "Série" ou perto de "NF-e"
-        Pattern pattern = Pattern.compile("\\b(\\d{6,9})\\b");
-        Matcher matcher = pattern.matcher(textoCompleto);
-        
-        // Pega os primeiros números encontrados
-        List<String> numeros = new ArrayList<>();
-        while (matcher.find() && numeros.size() < 10) {
-            String num = matcher.group(1);
-            // Ignora CNPJ (muito longo) e números muito curtos
-            if (num.length() >= 6 && num.length() <= 9) {
-                numeros.add(num);
-            }
+        if (textoCompleto == null || textoCompleto.isEmpty()) {
+            return "Não Encontrado (N/E)";
         }
         
-        // Geralmente o número da nota é um dos primeiros números de 6-7 dígitos
-        for (String num : numeros) {
-            if (num.length() >= 6 && num.length() <= 7) {
-                return num;
+        try {
+            // Procura por sequência de 6-9 dígitos que pode ser a nota
+            // Geralmente aparece após "Série" ou perto de "NF-e"
+            Pattern pattern = Pattern.compile("\\b(\\d{6,9})\\b");
+            Matcher matcher = pattern.matcher(textoCompleto);
+            
+            // Pega os primeiros números encontrados
+            List<String> numeros = new ArrayList<>();
+            while (matcher.find() && numeros.size() < 10) {
+                String num = matcher.group(1);
+                // Ignora CNPJ (muito longo) e números muito curtos
+                if (num.length() >= 6 && num.length() <= 9) {
+                    numeros.add(num);
+                }
             }
+            
+            // Geralmente o número da nota é um dos primeiros números de 6-7 dígitos
+            for (String num : numeros) {
+                if (num.length() >= 6 && num.length() <= 7) {
+                    return num;
+                }
+            }
+            
+            return numeros.isEmpty() ? "Não Encontrado (N/E)" : numeros.get(0);
+            
+        } catch (Exception e) {
+            System.err.println("Erro em ExtractDanfeNumberSimples: " + e.getMessage());
+            return "Não Encontrado (N/E)";
         }
-        
-        return numeros.isEmpty() ? "Não Encontrado (N/E)" : numeros.get(0);
     }
     
     // Método útil para debug
     public void debugExtraction(String textoCompleto) {
+        if (textoCompleto == null || textoCompleto.isEmpty()) {
+            System.out.println("\n=== DEBUG DE EXTRAÇÃO ===");
+            System.out.println("ERRO: Texto completo está vazio ou nulo!");
+            System.out.println("========================\n");
+            return;
+        }
+        
         System.out.println("\n=== DEBUG DE EXTRAÇÃO ===");
         System.out.println("Primeiros 500 caracteres do texto:");
         System.out.println(textoCompleto.substring(0, Math.min(500, textoCompleto.length())));
