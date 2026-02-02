@@ -1,4 +1,4 @@
-package com.mycompany.mgtbolina_project;
+    package com.mycompany.mgtbolina_project;
 public class Produto {
     public String descricao; // Deixando public para facilitar seu acesso direto
     public String valorUnitario;

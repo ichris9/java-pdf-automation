@@ -13,9 +13,13 @@ import javafx.scene.text.FontWeight;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import java.io.File;
+import java.util.ArrayList;
 import java.util.List;
 import javafx.scene.input.TransferMode;
 
+/**
+ * Interface gráfica melhorada com suporte a múltiplos PDFs
+ */
 public class InterfaceGrafica extends Application {
     
     // Cores Estilo Startup
@@ -29,16 +33,23 @@ public class InterfaceGrafica extends Application {
 
     private TextArea logArea;
     private Label statusLabel;
-    private Label pdfFileLabel;
+    private Label pdfFilesLabel;
     private Label excelFileLabel;
     private Button processButton;
     private Button exportButton;
     private VBox dropZone;
     private Stage primaryStage;
     
-    // Arquivos selecionados
-    private File pdfFile;
+    // NOVO: Lista de múltiplos PDFs
+    private List<File> pdfFiles = new ArrayList<>();
     private File excelFile;
+    
+    // NOVO: Lista de dados processados de cada PDF
+    private List<DadosPDF> dadosProcessados = new ArrayList<>();
+    
+    // NOVO: ComboBox para selecionar qual PDF editar
+    private ComboBox<String> seletorPDF;
+    private int pdfAtualIndex = -1;
     
     // Campos para edição manual dos dados extraídos
     private TextField campoNumNota;
@@ -48,29 +59,20 @@ public class InterfaceGrafica extends Application {
     private TextField campoFornecedor;
     private TextArea campoProdutos;
     private VBox editPanel;
-    
-    // Dados extraídos
-    private String numNota;
-    private String valorTotal;
-    private String data;
-    private String placaVeiculo;
-    private String fornecedor;
-    private List<Produto> listaDeProdutos;
 
     @Override
     public void start(Stage stage) {
         this.primaryStage = stage;
-        primaryStage.setTitle("MgtBolina | NF-e Extractor");
+        primaryStage.setTitle("MgtBolina | NF-e Extractor (Múltiplos PDFs)");
 
         BorderPane root = new BorderPane();
         root.setStyle("-fx-background-color: linear-gradient(to bottom right, " + COLOR_BG + ", #1e293b);");
 
-        // MUDANÇA PRINCIPAL: Envolver o conteúdo central em um ScrollPane
         VBox centerContent = createCenterContent();
         ScrollPane scrollPane = new ScrollPane(centerContent);
         scrollPane.setFitToWidth(true);
         scrollPane.setStyle("-fx-background: transparent; -fx-background-color: transparent;");
-        scrollPane.setPannable(true); // Permite arrastar para rolar
+        scrollPane.setPannable(true);
         
         root.setCenter(scrollPane);
 
@@ -81,13 +83,13 @@ public class InterfaceGrafica extends Application {
         primaryStage.setScene(scene);
         primaryStage.show();
         
-        logMessage("✅ Sistema iniciado! Selecione um PDF e uma planilha Excel.");
+        logMessage("✅ Sistema iniciado! Selecione um ou mais PDFs e uma planilha Excel.");
         System.out.println("DEBUG: Interface iniciada com sucesso");
     }
 
     private VBox createCenterContent() {
         VBox container = new VBox(20);
-        container.setAlignment(Pos.TOP_CENTER); // Mudei de CENTER para TOP_CENTER
+        container.setAlignment(Pos.TOP_CENTER);
         container.setPadding(new Insets(30));
 
         // Header
@@ -97,12 +99,12 @@ public class InterfaceGrafica extends Application {
         titleLabel.setFont(Font.font("Inter", FontWeight.BOLD, 36));
         titleLabel.setTextFill(Color.valueOf(COLOR_TEXT_MAIN));
 
-        Label subtitleLabel = new Label("Converta seus arquivos PDF para Excel em segundos");
+        Label subtitleLabel = new Label("Processe múltiplos PDFs de uma vez");
         subtitleLabel.setFont(Font.font("Inter", FontWeight.NORMAL, 16));
         subtitleLabel.setTextFill(Color.valueOf(COLOR_TEXT_DIM));
         header.getChildren().addAll(titleLabel, subtitleLabel);
 
-        // Drop Zone - REDUZIDO
+        // Drop Zone
         dropZone = createDropZone();
 
         // Files info section
@@ -112,10 +114,10 @@ public class InterfaceGrafica extends Application {
         HBox actionBox = new HBox(15);
         actionBox.setAlignment(Pos.CENTER);
 
-        Button selectPdfButton = createStyledButton("📄 Selecionar PDF", COLOR_CARD, COLOR_TEXT_MAIN);
+        Button selectPdfButton = createStyledButton("📄 Selecionar PDF(s)", COLOR_CARD, COLOR_TEXT_MAIN);
         selectPdfButton.setOnAction(e -> {
             System.out.println("DEBUG: Botão PDF clicado");
-            selectPDFFile();
+            selectPDFFiles();
         });
 
         Button selectExcelButton = createStyledButton("📊 Selecionar Excel", COLOR_CARD, COLOR_TEXT_MAIN);
@@ -124,15 +126,18 @@ public class InterfaceGrafica extends Application {
             selectExcelFile();
         });
 
-        processButton = createStyledButton("🔍 Processar PDF", COLOR_ACCENT, "#0F172A");
+        processButton = createStyledButton("🔍 Processar PDFs", COLOR_ACCENT, "#0F172A");
         processButton.setDisable(true);
-        processButton.setOnAction(e -> processarPDF());
+        processButton.setOnAction(e -> processarTodosPDFs());
 
         exportButton = createStyledButton("✅ Exportar para Excel", COLOR_SUCCESS, COLOR_TEXT_MAIN);
         exportButton.setDisable(true);
         exportButton.setOnAction(e -> exportarParaExcel());
 
-        actionBox.getChildren().addAll(selectPdfButton, selectExcelButton, processButton, exportButton);
+        Button clearQueueButton = createStyledButton("🗑️ Limpar Fila", "#EF4444", COLOR_TEXT_MAIN);
+        clearQueueButton.setOnAction(e -> limparFila());
+
+        actionBox.getChildren().addAll(selectPdfButton, selectExcelButton, processButton, exportButton, clearQueueButton);
 
         // Status
         statusLabel = new Label("Pronto para iniciar");
@@ -157,15 +162,15 @@ public class InterfaceGrafica extends Application {
         titleLabel.setFont(Font.font("Inter", FontWeight.BOLD, 14));
         titleLabel.setTextFill(Color.valueOf(COLOR_TEXT_MAIN));
 
-        pdfFileLabel = new Label("PDF: Nenhum arquivo selecionado");
-        pdfFileLabel.setFont(Font.font("Inter", FontWeight.NORMAL, 12));
-        pdfFileLabel.setTextFill(Color.valueOf(COLOR_TEXT_DIM));
+        pdfFilesLabel = new Label("PDFs: Nenhum arquivo selecionado");
+        pdfFilesLabel.setFont(Font.font("Inter", FontWeight.NORMAL, 12));
+        pdfFilesLabel.setTextFill(Color.valueOf(COLOR_TEXT_DIM));
 
         excelFileLabel = new Label("Excel: Nenhum arquivo selecionado");
         excelFileLabel.setFont(Font.font("Inter", FontWeight.NORMAL, 12));
         excelFileLabel.setTextFill(Color.valueOf(COLOR_TEXT_DIM));
 
-        section.getChildren().addAll(titleLabel, pdfFileLabel, excelFileLabel);
+        section.getChildren().addAll(titleLabel, pdfFilesLabel, excelFileLabel);
         return section;
     }
 
@@ -181,426 +186,307 @@ public class InterfaceGrafica extends Application {
         titleLabel.setFont(Font.font("Inter", FontWeight.BOLD, 16));
         titleLabel.setTextFill(Color.valueOf(COLOR_TEXT_MAIN));
 
+        // NOVO: Seletor de PDF para edição
+        HBox selectorBox = new HBox(10);
+        selectorBox.setAlignment(Pos.CENTER_LEFT);
+        Label selectorLabel = new Label("Selecionar PDF:");
+        selectorLabel.setTextFill(Color.valueOf(COLOR_TEXT_MAIN));
+        selectorLabel.setFont(Font.font("Inter", FontWeight.MEDIUM, 12));
+        
+        seletorPDF = new ComboBox<>();
+        seletorPDF.setStyle("-fx-background-color: " + COLOR_BG + "; -fx-text-fill: " + COLOR_TEXT_MAIN + ";");
+        seletorPDF.setPrefWidth(400);
+        seletorPDF.setOnAction(e -> carregarDadosPDFSelecionado());
+        
+        selectorBox.getChildren().addAll(selectorLabel, seletorPDF);
+
+        // Grid de campos
         GridPane grid = new GridPane();
         grid.setHgap(15);
         grid.setVgap(12);
         grid.setPadding(new Insets(15, 0, 0, 0));
 
-        // Criar campos de edição
-        campoNumNota = createTextField("Ex: 043730");
-        campoValorTotal = createTextField("Ex: 1.921,00");
-        campoData = createTextField("Ex: 17/10/2025");
-        campoPlaca = createTextField("Ex: ABC1234");
-        campoFornecedor = createTextField("Ex: EMPRESA LTDA");
+        // Labels e TextFields
+        Label labelNota = createFieldLabel("Número da Nota:");
+        campoNumNota = createTextField();
         
+        Label labelTotal = createFieldLabel("Valor Total:");
+        campoValorTotal = createTextField();
+        
+        Label labelData = createFieldLabel("Data:");
+        campoData = createTextField();
+        
+        Label labelPlaca = createFieldLabel("Placa do Veículo:");
+        campoPlaca = createTextField();
+        
+        Label labelFornecedor = createFieldLabel("Fornecedor:");
+        campoFornecedor = createTextField();
+
+        grid.add(labelNota, 0, 0);
+        grid.add(campoNumNota, 1, 0);
+        grid.add(labelTotal, 0, 1);
+        grid.add(campoValorTotal, 1, 1);
+        grid.add(labelData, 0, 2);
+        grid.add(campoData, 1, 2);
+        grid.add(labelPlaca, 0, 3);
+        grid.add(campoPlaca, 1, 3);
+        grid.add(labelFornecedor, 0, 4);
+        grid.add(campoFornecedor, 1, 4);
+
+        // Área de produtos
+        Label labelProdutos = createFieldLabel("Produtos:");
         campoProdutos = new TextArea();
-        campoProdutos.setPromptText("Produtos extraídos...");
-        campoProdutos.setPrefHeight(150); // Aumentei de 120 para 150
-        campoProdutos.setEditable(false);
+        campoProdutos.setPrefRowCount(6);
         campoProdutos.setStyle(
-            "-fx-control-inner-background: #0F172A;" +
-            "-fx-text-fill: " + COLOR_TEXT_MAIN + ";" +
-            "-fx-border-color: transparent;" +
-            "-fx-background-radius: 8;" +
-            "-fx-font-family: 'Courier New';" +
-            "-fx-font-size: 12;"
+            "-fx-control-inner-background: " + COLOR_BG + "; " +
+            "-fx-text-fill: " + COLOR_TEXT_MAIN + "; " +
+            "-fx-font-family: 'Courier New'; " +
+            "-fx-font-size: 11px;"
         );
 
-        // Labels e campos no grid
-        int row = 0;
-        grid.add(createLabel("Número da Nota:"), 0, row);
-        grid.add(campoNumNota, 1, row++);
-        
-        grid.add(createLabel("Valor Total:"), 0, row);
-        grid.add(campoValorTotal, 1, row++);
-        
-        grid.add(createLabel("Data:"), 0, row);
-        grid.add(campoData, 1, row++);
-        
-        grid.add(createLabel("Placa Veículo:"), 0, row);
-        grid.add(campoPlaca, 1, row++);
-        
-        grid.add(createLabel("Fornecedor:"), 0, row);
-        grid.add(campoFornecedor, 1, row++);
-        
-        grid.add(createLabel("Produtos:"), 0, row);
-        grid.add(campoProdutos, 1, row++);
+        // Botão para salvar edições do PDF atual
+        Button salvarEdicaoButton = createStyledButton("💾 Salvar Edições", COLOR_ACCENT, "#0F172A");
+        salvarEdicaoButton.setOnAction(e -> salvarEdicaoPDFAtual());
 
-        panel.getChildren().addAll(titleLabel, grid);
+        panel.getChildren().addAll(titleLabel, selectorBox, grid, labelProdutos, campoProdutos, salvarEdicaoButton);
         return panel;
     }
 
-    private Label createLabel(String text) {
-        Label label = new Label(text);
-        label.setFont(Font.font("Inter", FontWeight.MEDIUM, 13));
-        label.setTextFill(Color.valueOf(COLOR_TEXT_MAIN));
-        return label;
-    }
-
-    private TextField createTextField(String prompt) {
-        TextField field = new TextField();
-        field.setPromptText(prompt);
-        field.setPrefWidth(400);
-        field.setStyle(
-            "-fx-background-color: #0F172A;" +
-            "-fx-text-fill: " + COLOR_TEXT_MAIN + ";" +
-            "-fx-border-color: transparent;" +
-            "-fx-background-radius: 8;" +
-            "-fx-padding: 10;"
-        );
-        return field;
-    }
-
     private VBox createDropZone() {
-        VBox zone = new VBox(15);
-        zone.setAlignment(Pos.CENTER);
-        zone.setPadding(new Insets(40)); // Reduzido de 50 para 40
-        zone.setMaxWidth(600);
-        zone.setStyle(
-            "-fx-background-color: " + COLOR_CARD + ";" +
-            "-fx-border-color: " + COLOR_ACCENT + ";" +
-            "-fx-border-width: 2;" +
-            "-fx-border-style: dashed;" +
-            "-fx-border-radius: 15;" +
+        VBox dropBox = new VBox(10);
+        dropBox.setAlignment(Pos.CENTER);
+        dropBox.setPrefHeight(120);
+        dropBox.setMaxWidth(600);
+        dropBox.setStyle(
+            "-fx-background-color: " + COLOR_CARD + "; " +
+            "-fx-border-color: " + COLOR_ACCENT + "; " +
+            "-fx-border-width: 2; " +
+            "-fx-border-style: dashed; " +
+            "-fx-border-radius: 15; " +
             "-fx-background-radius: 15;"
         );
 
-        Label iconLabel = new Label("📂");
-        iconLabel.setFont(Font.font(40)); // Reduzido de 48 para 40
+        Label dropLabel = new Label("📂 Arraste e solte PDFs aqui");
+        dropLabel.setFont(Font.font("Inter", FontWeight.BOLD, 14));
+        dropLabel.setTextFill(Color.valueOf(COLOR_TEXT_DIM));
 
-        Label mainText = new Label("Arraste seus arquivos aqui");
-        mainText.setFont(Font.font("Inter", FontWeight.BOLD, 16)); // Reduzido de 18
-        mainText.setTextFill(Color.valueOf(COLOR_TEXT_MAIN));
+        Label hintLabel = new Label("ou use os botões abaixo");
+        hintLabel.setFont(Font.font("Inter", FontWeight.NORMAL, 11));
+        hintLabel.setTextFill(Color.valueOf(COLOR_TEXT_DIM));
 
-        Label subText = new Label("ou clique nos botões abaixo para selecionar");
-        subText.setFont(Font.font("Inter", FontWeight.NORMAL, 13)); // Reduzido de 14
-        subText.setTextFill(Color.valueOf(COLOR_TEXT_DIM));
+        dropBox.getChildren().addAll(dropLabel, hintLabel);
 
-        zone.getChildren().addAll(iconLabel, mainText, subText);
-
-        // Drag and Drop
-        zone.setOnDragOver(event -> {
+        // Drag and drop
+        dropBox.setOnDragOver(event -> {
             if (event.getDragboard().hasFiles()) {
                 event.acceptTransferModes(TransferMode.COPY);
             }
             event.consume();
         });
 
-        zone.setOnDragDropped(event -> {
+        dropBox.setOnDragDropped(event -> {
+            var dragboard = event.getDragboard();
             boolean success = false;
-            if (event.getDragboard().hasFiles()) {
-                for (File file : event.getDragboard().getFiles()) {
-                    String fileName = file.getName().toLowerCase();
-                    System.out.println("DEBUG: Arquivo arrastado: " + fileName);
-                    if (fileName.endsWith(".pdf")) {
-                        pdfFile = file;
-                        pdfFileLabel.setText("PDF: " + file.getName());
-                        pdfFileLabel.setTextFill(Color.valueOf(COLOR_SUCCESS));
-                        logMessage("✅ PDF selecionado: " + file.getName());
-                        success = true;
-                    } else if (fileName.endsWith(".xlsx") || fileName.endsWith(".xls")) {
-                        excelFile = file;
-                        excelFileLabel.setText("Excel: " + file.getName());
-                        excelFileLabel.setTextFill(Color.valueOf(COLOR_SUCCESS));
-                        logMessage("✅ Excel selecionado: " + file.getName());
-                        success = true;
+            if (dragboard.hasFiles()) {
+                List<File> arquivos = dragboard.getFiles();
+                for (File arquivo : arquivos) {
+                    if (arquivo.getName().toLowerCase().endsWith(".pdf")) {
+                        if (!pdfFiles.contains(arquivo)) {
+                            pdfFiles.add(arquivo);
+                        }
                     }
                 }
-                updateButtonStates();
+                atualizarLabelPDFs();
+                verificarBotoes();
+                success = true;
             }
             event.setDropCompleted(success);
             event.consume();
         });
 
-        return zone;
+        return dropBox;
     }
 
     private VBox createBottomContent() {
-        VBox bottom = new VBox(10);
-        bottom.setPadding(new Insets(15)); // Reduzido de 20 para 15
-        bottom.setStyle("-fx-background-color: " + COLOR_CARD + ";");
+        VBox bottomBox = new VBox(10);
+        bottomBox.setPadding(new Insets(15));
+        bottomBox.setStyle("-fx-background-color: " + COLOR_CARD + ";");
 
-        Label logLabel = new Label("📋 Log de Atividades");
-        logLabel.setFont(Font.font("Inter", FontWeight.BOLD, 13)); // Reduzido de 14
+        Label logLabel = new Label("📋 Log de Processamento");
+        logLabel.setFont(Font.font("Inter", FontWeight.BOLD, 13));
         logLabel.setTextFill(Color.valueOf(COLOR_TEXT_MAIN));
 
         logArea = new TextArea();
         logArea.setEditable(false);
-        logArea.setPrefHeight(120); // Reduzido de 150 para 120
-        logArea.setWrapText(true);
+        logArea.setPrefRowCount(6);
         logArea.setStyle(
-            "-fx-control-inner-background: #0F172A;" +
-            "-fx-text-fill: " + COLOR_TEXT_MAIN + ";" +
-            "-fx-border-color: transparent;" +
-            "-fx-font-family: 'Courier New';" +
-            "-fx-font-size: 11;"
+            "-fx-control-inner-background: " + COLOR_BG + "; " +
+            "-fx-text-fill: " + COLOR_TEXT_MAIN + "; " +
+            "-fx-font-family: 'Courier New'; " +
+            "-fx-font-size: 11px;"
         );
 
-        bottom.getChildren().addAll(logLabel, logArea);
-        return bottom;
+        bottomBox.getChildren().addAll(logLabel, logArea);
+        return bottomBox;
     }
 
     private Button createStyledButton(String text, String bgColor, String textColor) {
         Button button = new Button(text);
-        button.setFont(Font.font("Inter", FontWeight.BOLD, 13)); // Reduzido de 14
+        button.setFont(Font.font("Inter", FontWeight.BOLD, 13));
         button.setStyle(
-            "-fx-background-color: " + bgColor + ";" +
-            "-fx-text-fill: " + textColor + ";" +
-            "-fx-background-radius: 10;" +
-            "-fx-padding: 10 20;" + // Reduzido de 12 24
+            "-fx-background-color: " + bgColor + "; " +
+            "-fx-text-fill: " + textColor + "; " +
+            "-fx-background-radius: 8; " +
+            "-fx-padding: 12 24 12 24; " +
             "-fx-cursor: hand;"
         );
         
-        button.setOnMouseEntered(e -> button.setStyle(
-            "-fx-background-color: derive(" + bgColor + ", -10%);" +
-            "-fx-text-fill: " + textColor + ";" +
-            "-fx-background-radius: 10;" +
-            "-fx-padding: 10 20;" +
-            "-fx-cursor: hand;"
-        ));
+        button.setOnMouseEntered(e -> 
+            button.setStyle(
+                "-fx-background-color: derive(" + bgColor + ", 10%); " +
+                "-fx-text-fill: " + textColor + "; " +
+                "-fx-background-radius: 8; " +
+                "-fx-padding: 12 24 12 24; " +
+                "-fx-cursor: hand;"
+            )
+        );
         
-        button.setOnMouseExited(e -> button.setStyle(
-            "-fx-background-color: " + bgColor + ";" +
-            "-fx-text-fill: " + textColor + ";" +
-            "-fx-background-radius: 10;" +
-            "-fx-padding: 10 20;" +
-            "-fx-cursor: hand;"
-        ));
-
+        button.setOnMouseExited(e -> 
+            button.setStyle(
+                "-fx-background-color: " + bgColor + "; " +
+                "-fx-text-fill: " + textColor + "; " +
+                "-fx-background-radius: 8; " +
+                "-fx-padding: 12 24 12 24; " +
+                "-fx-cursor: hand;"
+            )
+        );
+        
         return button;
     }
 
-    private void selectPDFFile() {
-        System.out.println("DEBUG: Entrando em selectPDFFile()");
-        try {
-            FileChooser fileChooser = new FileChooser();
-            fileChooser.setTitle("Selecionar arquivo PDF");
-            fileChooser.getExtensionFilters().add(
-                new FileChooser.ExtensionFilter("Arquivos PDF", "*.pdf", "*.PDF")
-            );
-            
-            try {
-                File userHome = new File(System.getProperty("user.home"));
-                File downloads = new File(userHome, "Downloads");
-                if (downloads.exists()) {
-                    fileChooser.setInitialDirectory(downloads);
+    private Label createFieldLabel(String text) {
+        Label label = new Label(text);
+        label.setFont(Font.font("Inter", FontWeight.MEDIUM, 12));
+        label.setTextFill(Color.valueOf(COLOR_TEXT_DIM));
+        return label;
+    }
+
+    private TextField createTextField() {
+        TextField field = new TextField();
+        field.setPrefWidth(300);
+        field.setStyle(
+            "-fx-background-color: " + COLOR_BG + "; " +
+            "-fx-text-fill: " + COLOR_TEXT_MAIN + "; " +
+            "-fx-font-size: 12px; " +
+            "-fx-background-radius: 5; " +
+            "-fx-border-color: " + COLOR_TEXT_DIM + "; " +
+            "-fx-border-radius: 5;"
+        );
+        return field;
+    }
+
+    private void selectPDFFiles() {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Selecionar PDF(s)");
+        fileChooser.getExtensionFilters().add(
+            new FileChooser.ExtensionFilter("Arquivos PDF", "*.pdf")
+        );
+
+        List<File> selectedFiles = fileChooser.showOpenMultipleDialog(primaryStage);
+        if (selectedFiles != null && !selectedFiles.isEmpty()) {
+            for (File file : selectedFiles) {
+                if (!pdfFiles.contains(file)) {
+                    pdfFiles.add(file);
                 }
-            } catch (Exception e) {
-                System.err.println("DEBUG: Erro ao definir diretório inicial: " + e.getMessage());
             }
-            
-            File selected = fileChooser.showOpenDialog(primaryStage);
-            
-            if (selected != null) {
-                pdfFile = selected;
-                System.out.println("DEBUG: PDF selecionado - " + selected.getAbsolutePath());
-                pdfFileLabel.setText("PDF: " + selected.getName());
-                pdfFileLabel.setTextFill(Color.valueOf(COLOR_SUCCESS));
-                logMessage("✅ PDF selecionado: " + selected.getName());
-                updateButtonStates();
-            }
-        } catch (Exception e) {
-            System.err.println("DEBUG: ERRO em selectPDFFile: " + e.getMessage());
-            e.printStackTrace();
-            logMessage("❌ Erro ao selecionar PDF: " + e.getMessage());
+            atualizarLabelPDFs();
+            verificarBotoes();
+            logMessage("✅ " + selectedFiles.size() + " PDF(s) selecionado(s)");
         }
     }
 
     private void selectExcelFile() {
-        System.out.println("DEBUG: Entrando em selectExcelFile()");
-        try {
-            FileChooser fileChooser = new FileChooser();
-            fileChooser.setTitle("Selecionar planilha Excel");
-            fileChooser.getExtensionFilters().add(
-                new FileChooser.ExtensionFilter("Arquivos Excel", "*.xlsx", "*.xls", "*.XLSX", "*.XLS")
-            );
-            
-            try {
-                File userHome = new File(System.getProperty("user.home"));
-                File documents = new File(userHome, "Documents");
-                if (!documents.exists()) {
-                    documents = new File(userHome, "OneDrive\\Documents");
-                }
-                if (documents.exists()) {
-                    fileChooser.setInitialDirectory(documents);
-                }
-            } catch (Exception e) {
-                System.err.println("DEBUG: Erro ao definir diretório inicial: " + e.getMessage());
-            }
-            
-            File selected = fileChooser.showOpenDialog(primaryStage);
-            
-            if (selected != null) {
-                excelFile = selected;
-                System.out.println("DEBUG: Excel selecionado - " + selected.getAbsolutePath());
-                excelFileLabel.setText("Excel: " + selected.getName());
-                excelFileLabel.setTextFill(Color.valueOf(COLOR_SUCCESS));
-                logMessage("✅ Excel selecionado: " + selected.getName());
-                updateButtonStates();
-            }
-        } catch (Exception e) {
-            System.err.println("DEBUG: ERRO em selectExcelFile: " + e.getMessage());
-            e.printStackTrace();
-            logMessage("❌ Erro ao selecionar Excel: " + e.getMessage());
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Selecionar Planilha Excel");
+        fileChooser.getExtensionFilters().add(
+            new FileChooser.ExtensionFilter("Arquivos Excel", "*.xlsx", "*.xls")
+        );
+
+        File selectedFile = fileChooser.showOpenDialog(primaryStage);
+        if (selectedFile != null) {
+            excelFile = selectedFile;
+            excelFileLabel.setText("Excel: " + excelFile.getName());
+            verificarBotoes();
+            logMessage("✅ Excel selecionado: " + excelFile.getName());
         }
     }
 
-    private void updateButtonStates() {
-        System.out.println("DEBUG: updateButtonStates - PDF: " + (pdfFile != null) + ", Excel: " + (excelFile != null));
-        if (pdfFile != null && excelFile != null) {
-            processButton.setDisable(false);
-            statusLabel.setText("✅ Pronto para processar");
-            statusLabel.setTextFill(Color.valueOf(COLOR_SUCCESS));
-        } else if (pdfFile != null) {
-            statusLabel.setText("⚠️ Selecione também a planilha Excel");
-            statusLabel.setTextFill(Color.valueOf(COLOR_WARNING));
-        } else if (excelFile != null) {
-            statusLabel.setText("⚠️ Selecione também o arquivo PDF");
-            statusLabel.setTextFill(Color.valueOf(COLOR_WARNING));
+    private void atualizarLabelPDFs() {
+        if (pdfFiles.isEmpty()) {
+            pdfFilesLabel.setText("PDFs: Nenhum arquivo selecionado");
+        } else {
+            pdfFilesLabel.setText("PDFs: " + pdfFiles.size() + " arquivo(s) - " + 
+                                 pdfFiles.get(0).getName() + (pdfFiles.size() > 1 ? " e mais..." : ""));
         }
     }
 
-    private void logMessage(String message) {
-        Platform.runLater(() -> {
-            if (logArea != null) {
-                logArea.appendText(message + "\n");
-                logArea.setScrollTop(Double.MAX_VALUE);
-            }
-        });
+    private void verificarBotoes() {
+        processButton.setDisable(pdfFiles.isEmpty() || excelFile == null);
     }
 
-    private void processarPDF() {
-        if (pdfFile == null || excelFile == null) {
-            logMessage("❌ Erro: Selecione o PDF e o Excel antes de processar!");
-            return;
-        }
-
+    private void processarTodosPDFs() {
         processButton.setDisable(true);
-        statusLabel.setText("⏳ Processando PDF...");
+        exportButton.setDisable(true);
+        statusLabel.setText("⏳ Processando " + pdfFiles.size() + " PDF(s)...");
         statusLabel.setTextFill(Color.valueOf(COLOR_WARNING));
-        logArea.clear();
-        logMessage("🔄 Iniciando processamento do PDF: " + pdfFile.getName());
-        logMessage("📊 Excel de destino: " + excelFile.getName());
+        
+        dadosProcessados.clear();
+        seletorPDF.getItems().clear();
 
         new Thread(() -> {
             try {
-                logMessage("\n📖 Lendo conteúdo do PDF...");
-                
-                PdfLeitor leitor = new PdfLeitor();
-                String textoBruto = leitor.ExtractText(pdfFile.getAbsolutePath());
-                
-                if (textoBruto == null || textoBruto.isEmpty()) {
-                    Platform.runLater(() -> {
-                        logMessage("❌ Erro: Não foi possível extrair texto do PDF!");
-                        statusLabel.setText("❌ Falha na leitura");
-                        statusLabel.setTextFill(Color.valueOf("#EF4444"));
-                        processButton.setDisable(false);
-                    });
-                    return;
-                }
+                int total = pdfFiles.size();
+                int processados = 0;
 
-                String textoParaRegex = textoBruto.replace("|", " ");
-                
-                logMessage("✅ Texto extraído com sucesso (" + textoBruto.length() + " caracteres)");
-                logMessage("\n🔍 Extraindo dados da nota fiscal...");
-
-                PdfColetorDados coletor = new PdfColetorDados();
-                
-                try {
-                    this.numNota = coletor.ExtractDanfeNumber(textoParaRegex);
-                    logMessage("  📄 Número da Nota: " + (this.numNota != null ? this.numNota : "N/E"));
-                } catch (Exception e) {
-                    logMessage("  ⚠️ Erro ao extrair número da nota: " + e.getMessage());
-                    this.numNota = "N/E";
-                }
-                
-                try {
-                    this.valorTotal = coletor.ExtractTotalNumber(textoParaRegex);
-                    logMessage("  💰 Valor Total: " + (this.valorTotal != null ? this.valorTotal : "N/E"));
-                } catch (Exception e) {
-                    logMessage("  ⚠️ Erro ao extrair valor total: " + e.getMessage());
-                    this.valorTotal = "N/E";
-                }
-                
-                try {
-                    this.placaVeiculo = coletor.ExtracPlacaVeiculo(textoParaRegex);
-                    logMessage("  🚗 Placa: " + (this.placaVeiculo != null ? this.placaVeiculo : "N/E"));
-                } catch (Exception e) {
-                    logMessage("  ⚠️ Erro ao extrair placa: " + e.getMessage());
-                    this.placaVeiculo = "N/E";
-                }
-                
-                try {
-                    this.fornecedor = coletor.ExtractRazaoSocial(textoParaRegex);
-                    logMessage("  🏢 Fornecedor: " + (this.fornecedor != null ? this.fornecedor : "N/E"));
-                } catch (Exception e) {
-                    logMessage("  ⚠️ Erro ao extrair fornecedor: " + e.getMessage());
-                    this.fornecedor = "N/E";
-                }
-                
-                try {
-                    this.data = coletor.ExtractDate(textoParaRegex);
-                    logMessage("  📅 Data: " + (this.data != null ? this.data : "N/E"));
-                } catch (Exception e) {
-                    logMessage("  ⚠️ Erro ao extrair data: " + e.getMessage());
-                    this.data = "N/E";
-                }
-
-                logMessage("\n🛒 Extraindo produtos...");
-                try {
-                    ColetorProdutos coletorProdutos = new ColetorProdutos();
-                    this.listaDeProdutos = coletorProdutos.extrairTabelaPDF(pdfFile.getAbsolutePath());
+                for (File pdfFile : pdfFiles) {
+                    processados++;
+                    final int numAtual = processados;
                     
-                    if (this.listaDeProdutos == null || this.listaDeProdutos.isEmpty()) {
-                        logMessage("  ⚠️ Nenhum produto foi encontrado!");
-                        this.listaDeProdutos = new java.util.ArrayList<>();
-                    } else {
-                        logMessage("  ✅ " + this.listaDeProdutos.size() + " produto(s) extraído(s)");
-                    }
-                } catch (Exception e) {
-                    logMessage("  ❌ Erro ao extrair produtos: " + e.getMessage());
-                    e.printStackTrace();
-                    this.listaDeProdutos = new java.util.ArrayList<>();
+                    Platform.runLater(() -> {
+                        logMessage("\n═══════════════════════════════════════");
+                        logMessage("🔍 Processando PDF " + numAtual + "/" + total);
+                        logMessage("📄 " + pdfFile.getName());
+                        logMessage("═══════════════════════════════════════");
+                    });
+
+                    DadosPDF dadosPDF = processarUmPDF(pdfFile);
+                    dadosProcessados.add(dadosPDF);
+                    
+                    Platform.runLater(() -> {
+                        seletorPDF.getItems().add("PDF " + numAtual + ": " + pdfFile.getName());
+                    });
                 }
 
                 Platform.runLater(() -> {
-                    try {
-                        campoNumNota.setText(numNota != null ? numNota : "");
-                        campoValorTotal.setText(valorTotal != null ? valorTotal : "");
-                        campoData.setText(data != null ? data : "");
-                        campoPlaca.setText(placaVeiculo != null ? placaVeiculo : "");
-                        campoFornecedor.setText(fornecedor != null ? fornecedor : "");
-                        
-                        if (listaDeProdutos != null && !listaDeProdutos.isEmpty()) {
-                            StringBuilder sb = new StringBuilder();
-                            for (int i = 0; i < listaDeProdutos.size(); i++) {
-                                Produto p = listaDeProdutos.get(i);
-                                sb.append(String.format("[%d] %s - R$ %s\n", 
-                                    i + 1, p.descricao, p.valorUnitario));
-                            }
-                            campoProdutos.setText(sb.toString());
-                        } else {
-                            campoProdutos.setText("Nenhum produto encontrado");
-                        }
-
-                        editPanel.setVisible(true);
-                        editPanel.setManaged(true);
-                        exportButton.setDisable(false);
-                        
-                        logMessage("\n✅ Processamento concluído! Revise os dados e clique em 'Exportar'");
-                        statusLabel.setText("✅ Processado! Revise e exporte.");
-                        statusLabel.setTextFill(Color.valueOf(COLOR_SUCCESS));
-                        processButton.setDisable(false);
-                        
-                    } catch (Exception e) {
-                        logMessage("❌ Erro ao atualizar interface: " + e.getMessage());
-                        e.printStackTrace();
+                    logMessage("\n✅ Processamento completo! " + dadosProcessados.size() + " PDF(s) processado(s)");
+                    statusLabel.setText("✅ Processamento concluído!");
+                    statusLabel.setTextFill(Color.valueOf(COLOR_SUCCESS));
+                    
+                    editPanel.setVisible(true);
+                    editPanel.setManaged(true);
+                    
+                    if (!seletorPDF.getItems().isEmpty()) {
+                        seletorPDF.getSelectionModel().select(0);
+                        carregarDadosPDFSelecionado();
                     }
+                    
+                    exportButton.setDisable(false);
+                    processButton.setDisable(false);
                 });
 
             } catch (Exception e) {
                 Platform.runLater(() -> {
-                    logMessage("\n❌ ERRO CRÍTICO: " + e.getMessage());
+                    logMessage("\n❌ ERRO: " + e.getMessage());
                     e.printStackTrace();
                     statusLabel.setText("❌ Erro no processamento");
                     statusLabel.setTextFill(Color.valueOf("#EF4444"));
@@ -608,7 +494,7 @@ public class InterfaceGrafica extends Application {
                     
                     Alert alert = new Alert(Alert.AlertType.ERROR);
                     alert.setTitle("Erro");
-                    alert.setHeaderText("Erro ao processar PDF");
+                    alert.setHeaderText("Erro ao processar PDFs");
                     alert.setContentText("Detalhes: " + e.getMessage());
                     alert.showAndWait();
                 });
@@ -616,48 +502,145 @@ public class InterfaceGrafica extends Application {
         }).start();
     }
 
+    private DadosPDF processarUmPDF(File pdfFile) {
+        DadosPDF dadosPDF = new DadosPDF(pdfFile.getName());
+        
+        try {
+            PdfLeitor leitor = new PdfLeitor();
+            String textoParaRegex = leitor.ExtractText(pdfFile.getAbsolutePath());
+            
+            if (textoParaRegex != null && !textoParaRegex.isEmpty()) {
+                PdfColetorDados coletor = new PdfColetorDados();
+                
+                dadosPDF.setNumNota(coletor.ExtractDanfeNumber(textoParaRegex));
+                Platform.runLater(() -> logMessage("  📋 Nota: " + dadosPDF.getNumNota()));
+                
+                dadosPDF.setValorTotal(coletor.ExtractTotalNumber(textoParaRegex));
+                Platform.runLater(() -> logMessage("  💰 Total: " + dadosPDF.getValorTotal()));
+                
+                dadosPDF.setPlacaVeiculo(coletor.ExtracPlacaVeiculo(textoParaRegex));
+                Platform.runLater(() -> logMessage("  🚗 Placa: " + dadosPDF.getPlacaVeiculo()));
+                
+                dadosPDF.setFornecedor(coletor.ExtractRazaoSocial(textoParaRegex));
+                Platform.runLater(() -> logMessage("  🏢 Fornecedor: " + dadosPDF.getFornecedor()));
+                
+                dadosPDF.setData(coletor.ExtractDate(textoParaRegex));
+                Platform.runLater(() -> logMessage("  📅 Data: " + dadosPDF.getData()));
+                
+                ColetorProdutos coletorProdutos = new ColetorProdutos();
+                List<Produto> produtos = coletorProdutos.extrairTabelaPDF(pdfFile.getAbsolutePath());
+                
+                if (produtos == null || produtos.isEmpty()) {
+                    produtos = new ArrayList<>();
+                    Platform.runLater(() -> logMessage("  ⚠️ Nenhum produto encontrado"));
+                } else {
+                    final int totalProdutos = produtos.size();
+                    Platform.runLater(() -> logMessage("  ✅ " + totalProdutos + " produto(s) encontrado(s)"));
+                }
+                
+                dadosPDF.setListaDeProdutos(produtos);
+            }
+            
+        } catch (Exception e) {
+            Platform.runLater(() -> {
+                logMessage("  ❌ Erro ao processar: " + e.getMessage());
+                e.printStackTrace();
+            });
+        }
+        
+        return dadosPDF;
+    }
+
+    private void carregarDadosPDFSelecionado() {
+        int index = seletorPDF.getSelectionModel().getSelectedIndex();
+        if (index >= 0 && index < dadosProcessados.size()) {
+            pdfAtualIndex = index;
+            DadosPDF dados = dadosProcessados.get(index);
+            
+            campoNumNota.setText(dados.getNumNota() != null ? dados.getNumNota() : "");
+            campoValorTotal.setText(dados.getValorTotal() != null ? dados.getValorTotal() : "");
+            campoData.setText(dados.getData() != null ? dados.getData() : "");
+            campoPlaca.setText(dados.getPlacaVeiculo() != null ? dados.getPlacaVeiculo() : "");
+            campoFornecedor.setText(dados.getFornecedor() != null ? dados.getFornecedor() : "");
+            
+            if (dados.getListaDeProdutos() != null && !dados.getListaDeProdutos().isEmpty()) {
+                StringBuilder sb = new StringBuilder();
+                for (int i = 0; i < dados.getListaDeProdutos().size(); i++) {
+                    Produto p = dados.getListaDeProdutos().get(i);
+                    sb.append(String.format("[%d] %s - R$ %s\n", 
+                        i + 1, p.descricao, p.valorUnitario));
+                }
+                campoProdutos.setText(sb.toString());
+            } else {
+                campoProdutos.setText("Nenhum produto encontrado");
+            }
+            
+            logMessage("\n📝 Carregado para edição: " + dados.getNomePDF());
+        }
+    }
+
+    private void salvarEdicaoPDFAtual() {
+        if (pdfAtualIndex >= 0 && pdfAtualIndex < dadosProcessados.size()) {
+            DadosPDF dados = dadosProcessados.get(pdfAtualIndex);
+            
+            dados.setNumNota(campoNumNota.getText());
+            dados.setValorTotal(campoValorTotal.getText());
+            dados.setData(campoData.getText());
+            dados.setPlacaVeiculo(campoPlaca.getText());
+            dados.setFornecedor(campoFornecedor.getText());
+            
+            logMessage("✅ Edições salvas para: " + dados.getNomePDF());
+            
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.setTitle("Salvo");
+            alert.setHeaderText("Edições salvas!");
+            alert.setContentText("Os dados de " + dados.getNomePDF() + " foram atualizados.");
+            alert.showAndWait();
+        }
+    }
+
     private void exportarParaExcel() {
-        if (excelFile == null || listaDeProdutos == null) {
+        if (excelFile == null || dadosProcessados.isEmpty()) {
             logMessage("❌ Erro: Não há dados para exportar!");
             return;
         }
 
         exportButton.setDisable(true);
-        statusLabel.setText("⏳ Exportando para Excel...");
+        statusLabel.setText("⏳ Exportando " + dadosProcessados.size() + " PDF(s) para Excel...");
         statusLabel.setTextFill(Color.valueOf(COLOR_WARNING));
 
         new Thread(() -> {
             try {
-                String notaFinal = campoNumNota.getText();
-                String totalFinal = campoValorTotal.getText();
-                String dataFinal = campoData.getText();
-                String placaFinal = campoPlaca.getText();
-                String fornecedorFinal = campoFornecedor.getText();
-
                 logMessage("\n📤 Iniciando exportação para Excel...");
                 logMessage("📁 Caminho: " + excelFile.getAbsolutePath());
-                logMessage("\n📋 Dados a exportar:");
-                logMessage("   Nota: " + notaFinal);
-                logMessage("   Total: " + totalFinal);
-                logMessage("   Data: " + dataFinal);
-                logMessage("   Placa: " + placaFinal);
-                logMessage("   Fornecedor: " + fornecedorFinal);
-                logMessage("   Produtos: " + listaDeProdutos.size());
                 
                 ExportadorExcel exporter = new ExportadorExcel();
-                exporter.ExportDataTOExcel(
-                    excelFile.getAbsolutePath(),
-                    notaFinal,
-                    totalFinal,
-                    dataFinal,
-                    placaFinal,
-                    fornecedorFinal,
-                    listaDeProdutos
-                );
-
+                int totalProdutosExportados = 0;
+                
+                for (DadosPDF dados : dadosProcessados) {
+                    logMessage("\n📄 Exportando: " + dados.getNomePDF());
+                    logMessage("   Nota: " + dados.getNumNota());
+                    logMessage("   Produtos: " + (dados.getListaDeProdutos() != null ? dados.getListaDeProdutos().size() : 0));
+                    
+                    if (dados.getListaDeProdutos() != null && !dados.getListaDeProdutos().isEmpty()) {
+                        exporter.ExportDataTOExcel(
+                            excelFile.getAbsolutePath(),
+                            dados.getNumNota(),
+                            dados.getValorTotal(),
+                            dados.getData(),
+                            dados.getPlacaVeiculo(),
+                            dados.getFornecedor(),
+                            dados.getListaDeProdutos()
+                        );
+                        totalProdutosExportados += dados.getListaDeProdutos().size();
+                    }
+                }
+                
+                final int totalFinal = totalProdutosExportados;
+                
                 Platform.runLater(() -> {
-                    logMessage("\n✅ Dados exportados com sucesso!");
-                    logMessage("📊 " + listaDeProdutos.size() + " produto(s) adicionado(s)");
+                    logMessage("\n✅ Exportação completa!");
+                    logMessage("📊 Total de produtos exportados: " + totalFinal);
                     logMessage("💾 Arquivo: " + excelFile.getAbsolutePath());
                     statusLabel.setText("✅ Exportação concluída!");
                     statusLabel.setTextFill(Color.valueOf(COLOR_SUCCESS));
@@ -666,9 +649,9 @@ public class InterfaceGrafica extends Application {
                     alert.setTitle("Sucesso");
                     alert.setHeaderText("✅ Exportação concluída!");
                     alert.setContentText(
-                        "Dados exportados para:\n" +
-                        excelFile.getName() + "\n\n" +
-                        "Total de produtos: " + listaDeProdutos.size()
+                        dadosProcessados.size() + " PDF(s) exportado(s)\n" +
+                        totalFinal + " produto(s) total\n\n" +
+                        "Arquivo: " + excelFile.getName()
                     );
                     alert.showAndWait();
                     
@@ -685,13 +668,7 @@ public class InterfaceGrafica extends Application {
                     Alert alert = new Alert(Alert.AlertType.ERROR);
                     alert.setTitle("Erro");
                     alert.setHeaderText("❌ Falha ao exportar");
-                    alert.setContentText(
-                        "Erro: " + e.getMessage() + "\n\n" +
-                        "Verifique:\n" +
-                        "1. Excel não está aberto\n" +
-                        "2. Permissão para editar\n" +
-                        "3. Estrutura do arquivo"
-                    );
+                    alert.setContentText("Erro: " + e.getMessage());
                     alert.showAndWait();
                     
                     exportButton.setDisable(false);
@@ -700,7 +677,81 @@ public class InterfaceGrafica extends Application {
         }).start();
     }
 
-    public static void main(String[] args) { 
-        launch(args); 
+    private void logMessage(String message) {
+        Platform.runLater(() -> {
+            logArea.appendText(message + "\n");
+        });
+    }
+
+    private void limparFila() {
+        // Cria um diálogo de confirmação
+        Alert confirmacao = new Alert(Alert.AlertType.CONFIRMATION);
+        confirmacao.setTitle("Confirmar Limpeza");
+        confirmacao.setHeaderText("Limpar Fila de PDFs?");
+        confirmacao.setContentText(
+            "Isso irá remover todos os PDFs selecionados e dados processados.\n\n" +
+            "PDFs: " + pdfFiles.size() + "\n" +
+            "Dados processados: " + dadosProcessados.size() + "\n\n" +
+            "Deseja continuar?"
+        );
+
+        // Configura os botões
+        ButtonType botaoSim = new ButtonType("Sim, Limpar", ButtonBar.ButtonData.OK_DONE);
+        ButtonType botaoNao = new ButtonType("Cancelar", ButtonBar.ButtonData.CANCEL_CLOSE);
+        confirmacao.getButtonTypes().setAll(botaoSim, botaoNao);
+
+        // Mostra o diálogo e aguarda resposta
+        confirmacao.showAndWait().ifPresent(resposta -> {
+            if (resposta == botaoSim) {
+                // Limpa todos os arrays e dados
+                pdfFiles.clear();
+                dadosProcessados.clear();
+                pdfAtualIndex = -1;
+                
+                // Limpa o ComboBox de seleção de PDFs
+                if (seletorPDF != null) {
+                    seletorPDF.getItems().clear();
+                    seletorPDF.setValue(null);
+                }
+                
+                // Limpa os campos de edição
+                if (campoNumNota != null) campoNumNota.clear();
+                if (campoValorTotal != null) campoValorTotal.clear();
+                if (campoData != null) campoData.clear();
+                if (campoPlaca != null) campoPlaca.clear();
+                if (campoFornecedor != null) campoFornecedor.clear();
+                if (campoProdutos != null) campoProdutos.clear();
+                
+                // Esconde o painel de edição
+                if (editPanel != null) {
+                    editPanel.setVisible(false);
+                    editPanel.setManaged(false);
+                }
+                
+                // Atualiza os labels de arquivos
+                pdfFilesLabel.setText("PDFs: Nenhum arquivo selecionado");
+                
+                // Desabilita os botões de processar e exportar
+                processButton.setDisable(true);
+                exportButton.setDisable(true);
+                
+                // Atualiza o status
+                statusLabel.setText("Fila limpa - Pronto para começar novamente");
+                statusLabel.setTextFill(Color.valueOf(COLOR_TEXT_DIM));
+                
+                // Limpa o log
+                logArea.clear();
+                logMessage("🗑️ Fila limpa com sucesso!");
+                logMessage("✅ Sistema pronto para processar novos PDFs.");
+                
+                System.out.println("DEBUG: Fila limpa - Arrays zerados");
+                System.out.println("  pdfFiles.size() = " + pdfFiles.size());
+                System.out.println("  dadosProcessados.size() = " + dadosProcessados.size());
+            }
+        });
+    }
+
+    public static void main(String[] args) {
+        launch(args);
     }
 }
