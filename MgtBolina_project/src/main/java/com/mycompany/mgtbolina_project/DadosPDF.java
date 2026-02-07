@@ -12,6 +12,7 @@ public class DadosPDF {
     private String data;
     private String placaVeiculo;
     private String fornecedor;
+    private String unidade;
     private List<Produto> listaDeProdutos;
     
     public DadosPDF(String nomePDF) {
@@ -65,6 +66,14 @@ public class DadosPDF {
     
     public void setFornecedor(String fornecedor) {
         this.fornecedor = fornecedor;
+    }
+    
+    public String getUnidade(){
+        return this.getUnidade();
+    }
+    
+    public void setUnidade(String unidade){
+        this.unidade = unidade;
     }
     
     public List<Produto> getListaDeProdutos() {

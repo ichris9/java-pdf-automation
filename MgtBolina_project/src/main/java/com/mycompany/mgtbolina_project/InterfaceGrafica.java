@@ -568,6 +568,7 @@ public class InterfaceGrafica extends Application {
             campoData.setText(dados.getData() != null ? dados.getData() : "");
             campoPlaca.setText(dados.getPlacaVeiculo() != null ? dados.getPlacaVeiculo() : "");
             campoFornecedor.setText(dados.getFornecedor() != null ? dados.getFornecedor() : "");
+            campoUnidade.setText(dados.getUnidade()!= null ? dados.getUnidade() : "");
             
             if (dados.getListaDeProdutos() != null && !dados.getListaDeProdutos().isEmpty()) {
                 StringBuilder sb = new StringBuilder();
@@ -594,6 +595,7 @@ public class InterfaceGrafica extends Application {
             dados.setData(campoData.getText());
             dados.setPlacaVeiculo(campoPlaca.getText());
             dados.setFornecedor(campoFornecedor.getText());
+            dados.setUnidade(campoUnidade.getText());
             
             logMessage("✅ Edições salvas para: " + dados.getNomePDF());
             
@@ -775,6 +777,7 @@ private void exportarParaExcel() {
                 if (campoPlaca != null) campoPlaca.clear();
                 if (campoFornecedor != null) campoFornecedor.clear();
                 if (campoProdutos != null) campoProdutos.clear();
+                if (campoUnidade != null) campoUnidade.clear();
                 
                 // Esconde o painel de edição
                 if (editPanel != null) {
