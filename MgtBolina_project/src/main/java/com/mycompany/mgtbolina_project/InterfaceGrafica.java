@@ -58,6 +58,7 @@ public class InterfaceGrafica extends Application {
     private TextField campoPlaca;
     private TextField campoFornecedor;
     private TextArea campoProdutos;
+    private TextField campoUnidade;
     private VBox editPanel;
 
     @Override
@@ -221,6 +222,9 @@ public class InterfaceGrafica extends Application {
         
         Label labelFornecedor = createFieldLabel("Fornecedor:");
         campoFornecedor = createTextField();
+        
+        Label labelUnidade = createFieldLabel("Unidade");
+        campoUnidade = createTextField();
 
         grid.add(labelNota, 0, 0);
         grid.add(campoNumNota, 1, 0);
@@ -232,6 +236,8 @@ public class InterfaceGrafica extends Application {
         grid.add(campoPlaca, 1, 3);
         grid.add(labelFornecedor, 0, 4);
         grid.add(campoFornecedor, 1, 4);
+        grid.add(labelUnidade, 0, 5);
+        grid.add(campoUnidade, 1,5);
 
         // Área de produtos
         Label labelProdutos = createFieldLabel("Produtos:");

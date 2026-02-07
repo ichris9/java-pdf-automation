@@ -185,6 +185,7 @@ public class ExportadorExcel {
         int colForn = -1;
         int colDescricao = -1;
         int colValorUnit = -1;
+        int colUnidade = -1;  // 👈 NOVA COLUNA
         
         // Identifica as colunas pelo nome do cabeçalho
         for (Cell cell : headers) {
@@ -211,6 +212,9 @@ public class ExportadorExcel {
             if (nome.contains("UNIT")) {
                 colValorUnit = cell.getColumnIndex();
             }
+            if (nome.contains("UNID")) {  // 👈 BUSCA PELA COLUNA UNIDADE
+                colUnidade = cell.getColumnIndex();
+            }
         }
         
         // Valida se encontrou as colunas essenciais
@@ -229,6 +233,7 @@ public class ExportadorExcel {
         System.out.println("  Placa: " + colPlacaVeiculo);
         System.out.println("  Descrição: " + colDescricao);
         System.out.println("  Valor Unitário: " + colValorUnit);
+        System.out.println("  Unidade: " + colUnidade);  // 👈
         
         // Escreve os dados
         int linhasAdicionadas = 0;
@@ -266,6 +271,11 @@ public class ExportadorExcel {
             } else {
                 // Se não achou a coluna, usa índice fixo (coluna G = 6)
                 row.createCell(6).setCellValue(p.valorUnitario);
+            }
+            
+            // 👇 PREENCHE A UNIDADE
+            if (colUnidade != -1) {
+                row.createCell(colUnidade).setCellValue(p.unidade);
             }
             
             linhasAdicionadas++;

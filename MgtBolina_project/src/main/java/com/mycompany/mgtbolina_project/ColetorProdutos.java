@@ -151,7 +151,7 @@ public class ColetorProdutos {
                 Produto p = parsearLinhaConcatenada(textoLinha);
                 if (p != null) {
                     produtos.add(p);
-                    System.out.println("  -> ✓ PRODUTO ADICIONADO: " + p.descricao + " | R$ " + p.valorUnitario);
+                    System.out.println("  -> ✓ PRODUTO ADICIONADO: " + p.descricao + " | " + p.unidade + " | R$ " + p.valorUnitario);
                 }
                 
             } catch (Exception e) {
@@ -165,99 +165,134 @@ public class ColetorProdutos {
         return produtos;
     }
     
-    // Método aprimorado para parsear linha concatenada
+    // 🔥 ATUALIZADO: Agora captura UNIDADE
     private Produto parsearLinhaConcatenada(String linha) {
         if (linha == null || linha.isEmpty()) {
             return null;
         }
         
         try {
-            // Remove espaços múltiplos
             linha = linha.replaceAll("\\s+", " ").trim();
             
             System.out.println("  [Tentando parsear]: " + linha);
             
-            // Ignora linhas vazias ou muito curtas
             if (linha.length() < 10) {
                 System.out.println("  [Rejeitado]: linha muito curta");
                 return null;
             }
             
-            // Ignora cabeçalhos e outras linhas indesejadas
             String linhaUpper = linha.toUpperCase();
             if (linhaUpper.contains("CÓD") || linhaUpper.contains("DESCRIÇÃO") ||
-                linhaUpper.contains("DADOS") || linhaUpper.contains("CÁLCULO") ||
-                linhaUpper.contains("INFORMAÇÕES") || linhaUpper.contains("ALIQUOTA") ||
-                linhaUpper.contains("ISSQN") || linhaUpper.contains("RESERVADO") ||
-                linhaUpper.contains("BASE DE") || linhaUpper.contains("VALOR DO") ||
-                linhaUpper.contains("COMPLEMENTARES")) {
-                System.out.println("  [Rejeitado]: é cabeçalho ou informação adicional");
+                linhaUpper.contains("PRODUTO") || linhaUpper.contains("NCM") ||
+                linhaUpper.contains("CST") || linhaUpper.contains("CFOP") ||
+                linhaUpper.contains("ALIQ") || linhaUpper.contains("BASE") ||
+                linhaUpper.contains("CÁLCULO") || linhaUpper.contains("ICMS")) {
+                System.out.println("  [Rejeitado]: parece cabeçalho");
                 return null;
             }
             
-            // REGEX MELHORADO: Captura código, descrição e valores monetários
-            // Padrão: CÓDIGO DESCRIÇÃO NCM CST CFOP UNID QUANT V.UNIT V.TOTAL ...
             // Exemplo: "4776 BICA FINA DE GRANITO 25171000 000 5.101 TON 38,420 50,00 1.921,00"
             
-            // Padrão 1: Mais específico para DANFEs (com NCM, CST, CFOP)
+            // Padrão 1: Específico para DANFEs (com UNID) 👈
             Pattern pattern1 = Pattern.compile(
-                "^(\\d+)\\s+" +                                    // Código do produto
-                "([A-ZÀ-Ú][A-ZÀ-Úa-zà-ú0-9\\s/\\-\\.]+?)\\s+"+     // Descrição
-                "\\d{8}\\s+" +                                      // NCM
-                "\\d{3}\\s+" +                                      // CST
-                "[\\d\\.]+\\s+" +                                   // CFOP
-                "[A-Z]+\\s+" +                                      // UNID
-                "[\\d,]+\\s+" +                                     // QUANT
-                "(\\d{1,3}(?:\\.\\d{3})*,\\d{2})\\s+" +           // V.UNIT
-                "(\\d{1,3}(?:\\.\\d{3})*,\\d{2})"                 // V.TOTAL
+                "^(\\d+)\\s+" +
+                "([A-ZÀ-Ú][A-ZÀ-Úa-zà-ú0-9\\s/\\-\\.]+?)\\s+" +
+                "\\d{8}\\s+" +
+                "\\d{3}\\s+" +
+                "[\\d\\.]+\\s+" +
+                "([A-Z0-9]{1,6})\\s+" +         // 👈 UNID (TON, KG, UN, M3, etc)
+                "[\\d,]+\\s+" +
+                "(\\d{1,3}(?:\\.\\d{3})*,\\d{2})\\s+" +
+                "(\\d{1,3}(?:\\.\\d{3})*,\\d{2})"
             );
             
-            // Padrão 2: Mais flexível (caso o padrão 1 não funcione)
+            // Padrão 2: Flexível com unidade
             Pattern pattern2 = Pattern.compile(
-                "^(\\d+)\\s+" +                                    // Código
-                "([A-ZÀ-Ú][A-ZÀ-Úa-zà-ú0-9\\s/\\-\\.]+?)\\s+" +     // Descrição
-                ".*?" +                                             // Tudo no meio
-                "(\\d{1,3}(?:\\.\\d{3})*,\\d{2})\\s+" +           // Penúltimo valor (V.UNIT)
-                "(\\d{1,3}(?:\\.\\d{3})*,\\d{2})"                 // Último valor (V.TOTAL)
+                "^(\\d+)\\s+" +
+                "([A-ZÀ-Ú][A-ZÀ-Úa-zà-ú0-9\\s/\\-\\.]+?)\\s+" +
+                ".*?\\s([A-Z0-9]{1,6})\\s+" +   // 👈 UNID
+                ".*?" +
+                "(\\d{1,3}(?:\\.\\d{3})*,\\d{2})\\s+" +
+                "(\\d{1,3}(?:\\.\\d{3})*,\\d{2})"
             );
             
-            Matcher matcher1 = pattern1.matcher(linha);
-            Matcher matcher2 = pattern2.matcher(linha);
+            // Padrão 3: Fallback sem unidade
+            Pattern pattern3 = Pattern.compile(
+                "^(\\d+)\\s+" +
+                "([A-ZÀ-Ú][A-ZÀ-Úa-zà-ú0-9\\s/\\-\\.]+?)\\s+" +
+                ".*?" +
+                "(\\d{1,3}(?:\\.\\d{3})*,\\d{2})\\s+" +
+                "(\\d{1,3}(?:\\.\\d{3})*,\\d{2})"
+            );
             
-            Matcher matcherFinal = null;
-            if (matcher1.find()) {
-                matcherFinal = matcher1;
-                System.out.println("  [Match com padrão específico DANFE!]");
-            } else if (matcher2.find()) {
-                matcherFinal = matcher2;
-                System.out.println("  [Match com padrão flexível!]");
-            }
+            Matcher m1 = pattern1.matcher(linha);
+            Matcher m2 = pattern2.matcher(linha);
+            Matcher m3 = pattern3.matcher(linha);
             
-            if (matcherFinal != null && matcherFinal.groupCount() >= 4) {
-                String codigo = matcherFinal.group(1);
-                String descricao = matcherFinal.group(2).trim();
-                String valorUnit = matcherFinal.group(3);
-                String valorTotal = matcherFinal.group(4);
+            // Tenta padrão 1 (com unidade)
+            if (m1.find()) {
+                String codigo = m1.group(1);
+                String descricao = m1.group(2).trim();
+                String unidade = m1.group(3);      // 👈
+                String valorUnit = m1.group(4);
+                String valorTotal = m1.group(5);
                 
-                System.out.println("  [Dados capturados:]");
+                System.out.println("  [Match padrão 1 - COM UNIDADE!]");
+                System.out.println("    Código: " + codigo);
+                System.out.println("    Descrição: " + descricao);
+                System.out.println("    Unidade: " + unidade);  // 👈
+                System.out.println("    V.Unit: " + valorUnit);
+                System.out.println("    V.Total: " + valorTotal);
+                
+                if (isProdutoValido(codigo, descricao, valorUnit)) {
+                    System.out.println("  [PRODUTO VÁLIDO!]");
+                    return new Produto(descricao, valorUnit, unidade);  // 👈
+                }
+            }
+            // Tenta padrão 2 (flexível com unidade)
+            else if (m2.find()) {
+                String codigo = m2.group(1);
+                String descricao = m2.group(2).trim();
+                String unidade = m2.group(3);      // 👈
+                String valorUnit = m2.group(4);
+                String valorTotal = m2.group(5);
+                
+                System.out.println("  [Match padrão 2 - COM UNIDADE!]");
+                System.out.println("    Código: " + codigo);
+                System.out.println("    Descrição: " + descricao);
+                System.out.println("    Unidade: " + unidade);  // 👈
+                System.out.println("    V.Unit: " + valorUnit);
+                System.out.println("    V.Total: " + valorTotal);
+                
+                if (isProdutoValido(codigo, descricao, valorUnit)) {
+                    System.out.println("  [PRODUTO VÁLIDO!]");
+                    return new Produto(descricao, valorUnit, unidade);  // 👈
+                }
+            }
+            // Tenta padrão 3 (fallback SEM unidade - usa "UN")
+            else if (m3.find()) {
+                String codigo = m3.group(1);
+                String descricao = m3.group(2).trim();
+                String valorUnit = m3.group(3);
+                String valorTotal = m3.group(4);
+                
+                System.out.println("  [Match padrão 3 - SEM unidade (usa UN)]");
                 System.out.println("    Código: " + codigo);
                 System.out.println("    Descrição: " + descricao);
                 System.out.println("    V.Unit: " + valorUnit);
                 System.out.println("    V.Total: " + valorTotal);
                 
-                // Valida se parece um produto real
                 if (isProdutoValido(codigo, descricao, valorUnit)) {
                     System.out.println("  [PRODUTO VÁLIDO!]");
-                    return new Produto(descricao, valorUnit);
-                } else {
-                    System.out.println("  [Rejeitado]: validação falhou");
+                    return new Produto(descricao, valorUnit);  // Usa construtor legado (UN padrão)
                 }
-            } else {
-                System.out.println("  [Rejeitado]: não deu match em nenhum padrão regex");
+            }
+            else {
+                System.out.println("  [Rejeitado]: nenhum padrão deu match");
             }
             
         } catch (Exception e) {
-            System.err.println("  [Erro ao parsear linha]: " + e.getMessage());
+            System.err.println("  [Erro ao parsear]: " + e.getMessage());
         }
         
         return null;
@@ -269,7 +304,6 @@ public class ColetorProdutos {
         }
         
         try {
-            // Verifica se a linha contém palavras típicas de cabeçalho de produtos
             StringBuilder linhaCompleta = new StringBuilder();
             for (RectangularTextContainer cell : linha) {
                 if (cell != null && cell.getText() != null) {
@@ -287,7 +321,6 @@ public class ColetorProdutos {
                 }
             }
             
-            // Também procura na linha completa
             String linhaStr = linhaCompleta.toString();
             if ((linhaStr.contains("CÓD") || linhaStr.contains("PRODUTO")) && 
                 (linhaStr.contains("DESCRIÇÃO") || linhaStr.contains("SERVIÇO"))) {
@@ -304,22 +337,18 @@ public class ColetorProdutos {
     
     private boolean isProdutoValido(String codigo, String descricao, String valorUnitario) {
         try {
-            // Remove encoding problems
             descricao = normalizarTexto(descricao);
             
-            // 1. Descrição não pode estar vazia
             if (descricao == null || descricao.isEmpty()) {
                 System.out.println("    ✗ Descrição vazia");
                 return false;
             }
             
-            // 2. Descrição NÃO pode ser apenas números (isso seria o código)
             if (descricao.matches("^\\d+$")) {
                 System.out.println("    ✗ Descrição é só código: " + descricao);
                 return false;
             }
             
-            // 3. Não pode ser cabeçalho ou informação administrativa
             String descUpper = descricao.toUpperCase();
             if (descUpper.contains("DESCRIÇÃO") || descUpper.contains("DESCRICAO") ||
                 descUpper.contains("CÓD") || descUpper.contains("NCM") || 
@@ -336,7 +365,6 @@ public class ColetorProdutos {
                 return false;
             }
             
-            // 4. Valor unitário precisa ser um número válido
             if (valorUnitario == null || valorUnitario.isEmpty()) {
                 System.out.println("    ✗ Valor unitário vazio");
                 return false;
@@ -348,7 +376,6 @@ public class ColetorProdutos {
                 return false;
             }
             
-            // 5. Descrição precisa ter mais de 2 caracteres E conter letras
             if (descricao.length() < 3 || !descricao.matches(".*[A-Za-z]+.*")) {
                 System.out.println("    ✗ Descrição muito curta ou sem letras");
                 return false;
@@ -365,7 +392,6 @@ public class ColetorProdutos {
     
     private String limparValor(String valor) {
         if (valor == null) return "";
-        // Remove espaços e mantém apenas números, vírgula e ponto
         return valor.replaceAll("[^0-9,.]", "").trim();
     }
     
