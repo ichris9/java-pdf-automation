@@ -599,82 +599,130 @@ public class InterfaceGrafica extends Application {
         }
     }
 
-    private void exportarParaExcel() {
+private void exportarParaExcel() {
         if (excelFile == null || dadosProcessados.isEmpty()) {
             logMessage("❌ Erro: Não há dados para exportar!");
             return;
         }
 
         exportButton.setDisable(true);
-        statusLabel.setText("⏳ Exportando " + dadosProcessados.size() + " PDF(s) para Excel...");
+        statusLabel.setText("📊 Verificando abas do Excel...");
         statusLabel.setTextFill(Color.valueOf(COLOR_WARNING));
-
-        new Thread(() -> {
-            try {
-                logMessage("\n📤 Iniciando exportação para Excel...");
-                logMessage("📁 Caminho: " + excelFile.getAbsolutePath());
+        
+        // 🔥 NOVA FUNCIONALIDADE: Seleção de aba
+        ExportadorExcel exporter = new ExportadorExcel();
+        
+        logMessage("\n📊 Verificando abas disponíveis no Excel...");
+        
+        SeletorDeAbas.selecionarAbaAsync(exporter, excelFile.getAbsolutePath(), 
+            new SeletorDeAbas.SelecionarAbaCallback() {
                 
-                ExportadorExcel exporter = new ExportadorExcel();
-                int totalProdutosExportados = 0;
-                
-                for (DadosPDF dados : dadosProcessados) {
-                    logMessage("\n📄 Exportando: " + dados.getNomePDF());
-                    logMessage("   Nota: " + dados.getNumNota());
-                    logMessage("   Produtos: " + (dados.getListaDeProdutos() != null ? dados.getListaDeProdutos().size() : 0));
+                @Override
+                public void onAbaSelecionada(String nomeAba) {
+                    logMessage("✅ Aba selecionada: " + nomeAba);
+                    statusLabel.setText("⏳ Exportando " + dadosProcessados.size() + " PDF(s) para Excel...");
                     
-                    if (dados.getListaDeProdutos() != null && !dados.getListaDeProdutos().isEmpty()) {
-                        exporter.ExportDataTOExcel(
-                            excelFile.getAbsolutePath(),
-                            dados.getNumNota(),
-                            dados.getValorTotal(),
-                            dados.getData(),
-                            dados.getPlacaVeiculo(),
-                            dados.getFornecedor(),
-                            dados.getListaDeProdutos()
-                        );
-                        totalProdutosExportados += dados.getListaDeProdutos().size();
-                    }
+                    // Processa a exportação em thread separada
+                    new Thread(() -> {
+                        try {
+                            logMessage("\n📤 Iniciando exportação para Excel...");
+                            logMessage("📁 Caminho: " + excelFile.getAbsolutePath());
+                            logMessage("📋 Aba destino: " + nomeAba);
+                            
+                            int totalProdutosExportados = 0;
+                            
+                            for (DadosPDF dados : dadosProcessados) {
+                                logMessage("\n📄 Exportando: " + dados.getNomePDF());
+                                logMessage("   Nota: " + dados.getNumNota());
+                                logMessage("   Produtos: " + (dados.getListaDeProdutos() != null ? dados.getListaDeProdutos().size() : 0));
+                                
+                                if (dados.getListaDeProdutos() != null && !dados.getListaDeProdutos().isEmpty()) {
+                                    // 👇 USA O MÉTODO COM SELEÇÃO DE ABA
+                                    exporter.ExportDataTOExcel(
+                                        excelFile.getAbsolutePath(),
+                                        nomeAba,  // 👈 Passa o nome da aba selecionada
+                                        dados.getNumNota(),
+                                        dados.getValorTotal(),
+                                        dados.getData(),
+                                        dados.getPlacaVeiculo(),
+                                        dados.getFornecedor(),
+                                        dados.getListaDeProdutos()
+                                    );
+                                    totalProdutosExportados += dados.getListaDeProdutos().size();
+                                }
+                            }
+                            
+                            final int totalFinal = totalProdutosExportados;
+                            
+                            Platform.runLater(() -> {
+                                logMessage("\n✅ Exportação completa!");
+                                logMessage("📊 Total de produtos exportados: " + totalFinal);
+                                logMessage("📋 Aba utilizada: " + nomeAba);
+                                logMessage("💾 Arquivo: " + excelFile.getAbsolutePath());
+                                statusLabel.setText("✅ Exportação concluída!");
+                                statusLabel.setTextFill(Color.valueOf(COLOR_SUCCESS));
+                                
+                                Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                                alert.setTitle("Sucesso");
+                                alert.setHeaderText("✅ Exportação concluída!");
+                                alert.setContentText(
+                                    dadosProcessados.size() + " PDF(s) exportado(s)\n" +
+                                    totalFinal + " produto(s) total\n" +
+                                    "Aba: " + nomeAba + "\n\n" +
+                                    "Arquivo: " + excelFile.getName()
+                                );
+                                alert.showAndWait();
+                                
+                                exportButton.setDisable(false);
+                            });
+
+                        } catch (Exception e) {
+                            Platform.runLater(() -> {
+                                logMessage("\n❌ ERRO na exportação: " + e.getMessage());
+                                e.printStackTrace();
+                                statusLabel.setText("❌ Falha na exportação");
+                                statusLabel.setTextFill(Color.valueOf("#EF4444"));
+                                
+                                Alert alert = new Alert(Alert.AlertType.ERROR);
+                                alert.setTitle("Erro");
+                                alert.setHeaderText("❌ Falha ao exportar");
+                                alert.setContentText("Erro: " + e.getMessage());
+                                alert.showAndWait();
+                                
+                                exportButton.setDisable(false);
+                            });
+                        }
+                    }).start();
                 }
                 
-                final int totalFinal = totalProdutosExportados;
+                @Override
+                public void onErro(String mensagem) {
+                    Platform.runLater(() -> {
+                        logMessage("❌ Erro ao listar abas: " + mensagem);
+                        statusLabel.setText("❌ Erro ao acessar Excel");
+                        statusLabel.setTextFill(Color.valueOf("#EF4444"));
+                        
+                        Alert alert = new Alert(Alert.AlertType.ERROR);
+                        alert.setTitle("Erro");
+                        alert.setHeaderText("❌ Erro ao acessar Excel");
+                        alert.setContentText(mensagem);
+                        alert.showAndWait();
+                        
+                        exportButton.setDisable(false);
+                    });
+                }
                 
-                Platform.runLater(() -> {
-                    logMessage("\n✅ Exportação completa!");
-                    logMessage("📊 Total de produtos exportados: " + totalFinal);
-                    logMessage("💾 Arquivo: " + excelFile.getAbsolutePath());
-                    statusLabel.setText("✅ Exportação concluída!");
-                    statusLabel.setTextFill(Color.valueOf(COLOR_SUCCESS));
-                    
-                    Alert alert = new Alert(Alert.AlertType.INFORMATION);
-                    alert.setTitle("Sucesso");
-                    alert.setHeaderText("✅ Exportação concluída!");
-                    alert.setContentText(
-                        dadosProcessados.size() + " PDF(s) exportado(s)\n" +
-                        totalFinal + " produto(s) total\n\n" +
-                        "Arquivo: " + excelFile.getName()
-                    );
-                    alert.showAndWait();
-                    
-                    exportButton.setDisable(false);
-                });
-
-            } catch (Exception e) {
-                Platform.runLater(() -> {
-                    logMessage("\n❌ ERRO na exportação: " + e.getMessage());
-                    e.printStackTrace();
-                    statusLabel.setText("❌ Falha na exportação");
-                    statusLabel.setTextFill(Color.valueOf("#EF4444"));
-                    
-                    Alert alert = new Alert(Alert.AlertType.ERROR);
-                    alert.setTitle("Erro");
-                    alert.setHeaderText("❌ Falha ao exportar");
-                    alert.setContentText("Erro: " + e.getMessage());
-                    alert.showAndWait();
-                    
-                    exportButton.setDisable(false);
-                });
+                @Override
+                public void onCancelado() {
+                    Platform.runLater(() -> {
+                        logMessage("⚠️ Exportação cancelada pelo usuário");
+                        statusLabel.setText("⚠️ Exportação cancelada");
+                        statusLabel.setTextFill(Color.valueOf(COLOR_WARNING));
+                        exportButton.setDisable(false);
+                    });
+                }
             }
-        }).start();
+        );
     }
 
     private void logMessage(String message) {
