@@ -533,6 +533,8 @@ public class InterfaceGrafica extends Application {
                 dadosPDF.setData(coletor.ExtractDate(textoParaRegex));
                 Platform.runLater(() -> logMessage("  📅 Data: " + dadosPDF.getData()));
                 
+                dadosPDF.setUnidade(coletor.);
+                
                 ColetorProdutos coletorProdutos = new ColetorProdutos();
                 List<Produto> produtos = coletorProdutos.extrairTabelaPDF(pdfFile.getAbsolutePath());
                 
