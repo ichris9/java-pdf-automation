@@ -69,7 +69,7 @@ public class DadosPDF {
     }
     
     public String getUnidade(){
-        return this.getUnidade();
+        return this.unidade;
     }
     
     public void setUnidade(String unidade){
