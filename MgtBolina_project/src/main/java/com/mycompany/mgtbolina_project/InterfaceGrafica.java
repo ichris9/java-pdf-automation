@@ -577,8 +577,8 @@ public class InterfaceGrafica extends Application {
                 StringBuilder sb = new StringBuilder();
                 for (int i = 0; i < dados.getListaDeProdutos().size(); i++) {
                     Produto p = dados.getListaDeProdutos().get(i);
-                    sb.append(String.format("[%d] %s - R$ %s\n", 
-                        i + 1, p.descricao, p.valorUnitario));
+                    sb.append(String.format("[%d] %s | %s | R$ %s\n", 
+                        i + 1, p.descricao, p.unidade, p.valorUnitario));
                 }
                 campoProdutos.setText(sb.toString());
             } else {
