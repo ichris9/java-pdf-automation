@@ -10,9 +10,10 @@ public class DadosPDF {
     private String numNota;
     private String valorTotal;
     private String data;
-    private String placaVeiculo;
     private String fornecedor;
     private String unidade;
+    private String valorUnitario;  // 👈 NOVO CAMPO
+    private String placaVeiculo;
     private List<Produto> listaDeProdutos;
     
     public DadosPDF(String nomePDF) {
@@ -68,13 +69,24 @@ public class DadosPDF {
         this.fornecedor = fornecedor;
     }
     
-    public String getUnidade(){
-        return this.unidade;
+    public String getUnidade() {
+        return unidade;
     }
     
-    public void setUnidade(String unidade){
+    public void setUnidade(String unidade) {
         this.unidade = unidade;
     }
+    
+    // 👇 NOVO GETTER E SETTER PARA VALOR UNITÁRIO
+    public String getValorUnitario() {
+        return valorUnitario;
+    }
+    
+    public void setValorUnitario(String valorUnitario) {
+        this.valorUnitario = valorUnitario;
+    }
+    
+    
     
     public List<Produto> getListaDeProdutos() {
         return listaDeProdutos;

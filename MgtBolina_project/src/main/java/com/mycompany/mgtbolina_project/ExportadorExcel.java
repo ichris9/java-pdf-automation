@@ -62,11 +62,14 @@ public class ExportadorExcel {
      * @param data Data da nota
      * @param placaVeic Placa do veículo
      * @param forn Fornecedor
+     * @param unidade Unidade dos produtos (TON, KG, etc)
+     * @param valorUnitario Valor unitário do produto
      * @param listaDeProdutos Lista de produtos a serem exportados
      */
     public void ExportDataTOExcel(String filePath, String nomeAba, String numNota, 
                                    String valorTotal, String data, String placaVeic, 
-                                   String forn, List<Produto> listaDeProdutos) {
+                                   String forn, String unidade, String valorUnitario,
+                                   List<Produto> listaDeProdutos) {
         
         FileInputStream leituraBytes = null;
         FileOutputStream outputStream = null;
@@ -91,7 +94,7 @@ public class ExportadorExcel {
             System.out.println("\n✅ Exportando para a aba: " + nomeAba);
             
             // Processa a exportação
-            processarExportacao(sheet, numNota, valorTotal, data, placaVeic, forn, listaDeProdutos);
+            processarExportacao(sheet, numNota, valorTotal, data, placaVeic, forn, unidade, valorUnitario, listaDeProdutos);
             
             // Salvar o arquivo
             outputStream = new FileOutputStream(filePath);
@@ -135,8 +138,17 @@ public class ExportadorExcel {
             
             System.out.println("\n⚠️ Usando primeira aba por padrão: " + workbook.getSheetName(0));
             
+            // Pega unidade e valor unitário do primeiro produto (para compatibilidade)
+            String unidade = "";
+            String valorUnitario = "";
+            if (listaDeProdutos != null && !listaDeProdutos.isEmpty()) {
+                Produto primeiro = listaDeProdutos.get(0);
+                unidade = primeiro.unidade != null ? primeiro.unidade : "";
+                valorUnitario = primeiro.valorUnitario != null ? primeiro.valorUnitario : "";
+            }
+            
             // Processa a exportação
-            processarExportacao(sheet, numNota, valorTotal, data, placaVeic, forn, listaDeProdutos);
+            processarExportacao(sheet, numNota, valorTotal, data, placaVeic, forn, unidade, valorUnitario, listaDeProdutos);
             
             // Salvar o arquivo
             outputStream = new FileOutputStream(filePath);
@@ -169,6 +181,7 @@ public class ExportadorExcel {
      */
     private void processarExportacao(XSSFSheet sheet, String numNota, String valorTotal, 
                                      String data, String placaVeic, String forn, 
+                                     String unidade, String valorUnitario,
                                      List<Produto> listaDeProdutos) {
         
         // Ler cabeçalhos
@@ -266,16 +279,17 @@ public class ExportadorExcel {
                 row.createCell(5).setCellValue(p.descricao);
             }
             
+            // 👇 USA O VALOR UNITÁRIO DO PARÂMETRO (editável na interface)
             if (colValorUnit != -1) {
-                row.createCell(colValorUnit).setCellValue(p.valorUnitario);
+                row.createCell(colValorUnit).setCellValue(valorUnitario != null ? valorUnitario : "");
             } else {
                 // Se não achou a coluna, usa índice fixo (coluna G = 6)
-                row.createCell(6).setCellValue(p.valorUnitario);
+                row.createCell(6).setCellValue(valorUnitario != null ? valorUnitario : "");
             }
             
-            // 👇 PREENCHE A UNIDADE
+            // 👇 USA A UNIDADE DO PARÂMETRO (editável na interface)
             if (colUnidade != -1) {
-                row.createCell(colUnidade).setCellValue(p.unidade);
+                row.createCell(colUnidade).setCellValue(unidade != null ? unidade : "");
             }
             
             linhasAdicionadas++;

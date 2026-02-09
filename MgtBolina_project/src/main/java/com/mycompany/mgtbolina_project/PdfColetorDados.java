@@ -270,36 +270,6 @@ public class PdfColetorDados {
             return "Não Encontrado (N/E)";
         }
     }
-    public String ExtractUnidade(String textoCompleto){
-        if(textoCompleto == null || textoCompleto.isEmpty()){
-            return "Não Encontrado (N/E)";
-        }
-        
-        String[] patterns =
-        { "^(\\d+)\\s+" +
-                "([A-ZÀ-Ú][A-ZÀ-Úa-zà-ú0-9\\s/\\-\\.]+?)\\s+" +
-                "\\d{8}\\s+" +
-                "\\d{3}\\s+" +
-                "[\\d\\.]+\\s+" +
-                "([A-Z0-9]{1,6})\\s+" +         // 👈 UNID (TON, KG, UN, M3, etc)
-                "[\\d,]+\\s+" +
-                "(\\d{1,3}(?:\\.\\d{3})*,\\d{2})\\s+" +
-                "(\\d{1,3}(?:\\.\\d{3})*,\\d{2})" +
-                "^(\\d+)\\s+" +
-                "([A-ZÀ-Ú][A-ZÀ-Úa-zà-ú0-9\\s/\\-\\.]+?)\\s+" +
-                ".*?\\s([A-Z0-9]{1,6})\\s+" +   // 👈 UNID
-                ".*?" +
-                "(\\d{1,3}(?:\\.\\d{3})*,\\d{2})\\s+" +
-                "(\\d{1,3}(?:\\.\\d{3})*,\\d{2})" +
-                "^(\\d+)\\s+" +
-                "([A-ZÀ-Ú][A-ZÀ-Úa-zà-ú0-9\\s/\\-\\.]+?)\\s+" +
-                ".*?" +
-                "(\\d{1,3}(?:\\.\\d{3})*,\\d{2})\\s+" +
-                "(\\d{1,3}(?:\\.\\d{3})*,\\d{2})"
-        
-        };
-         return extractWithMultiplePatterns(textoCompleto, patterns);
-    } 
      
     
     // Método útil para debug
