@@ -18,11 +18,11 @@ import java.util.List;
 import javafx.scene.input.TransferMode;
 
 /**
- * Interface gráfica melhorada com suporte a múltiplos PDFs
+ * Interface gráfica com suporte a múltiplos PDFs.
+ * Cada produto tem seu próprio valorUnitario, unidade e quantidade.
  */
 public class InterfaceGrafica extends Application {
-    
-    // Cores Estilo Startup
+
     private static final String COLOR_BG = "#0F172A";
     private static final String COLOR_CARD = "#1E293B";
     private static final String COLOR_ACCENT = "#38BDF8";
@@ -39,27 +39,31 @@ public class InterfaceGrafica extends Application {
     private Button exportButton;
     private VBox dropZone;
     private Stage primaryStage;
-    
-    // NOVO: Lista de múltiplos PDFs
+
     private List<File> pdfFiles = new ArrayList<>();
     private File excelFile;
-    
-    // NOVO: Lista de dados processados de cada PDF
     private List<DadosPDF> dadosProcessados = new ArrayList<>();
-    
-    // NOVO: ComboBox para selecionar qual PDF editar
+
+    // Seletor de PDF
     private ComboBox<String> seletorPDF;
     private int pdfAtualIndex = -1;
-    
-    // Campos para edição manual dos dados extraídos
+
+    // Campos gerais do PDF
     private TextField campoNumNota;
-    private TextField campoValorTotal;
     private TextField campoData;
     private TextField campoPlaca;
     private TextField campoFornecedor;
-    private TextField campoUnidade;  // Campo Unidade
-    private TextField campoValorUnitario;  // 👈 NOVO CAMPO
+
+    // Área de listagem de produtos (somente leitura visual)
     private TextArea campoProdutos;
+
+    // Campos de edição por produto
+    private ComboBox<String> seletorProduto;
+    private TextField campoValorUnitarioProduto;
+    private TextField campoUnidadeProduto;
+    private TextField campoQuantidadeProduto;
+    private Button salvarProdutoButton;
+
     private VBox editPanel;
 
     @Override
@@ -75,18 +79,17 @@ public class InterfaceGrafica extends Application {
         scrollPane.setFitToWidth(true);
         scrollPane.setStyle("-fx-background: transparent; -fx-background-color: transparent;");
         scrollPane.setPannable(true);
-        
+
         root.setCenter(scrollPane);
 
         VBox bottomContent = createBottomContent();
         root.setBottom(bottomContent);
 
-        Scene scene = new Scene(root, 1100, 850);
+        Scene scene = new Scene(root, 1100, 900);
         primaryStage.setScene(scene);
         primaryStage.show();
-        
+
         logMessage("✅ Sistema iniciado! Selecione um ou mais PDFs e uma planilha Excel.");
-        System.out.println("DEBUG: Interface iniciada com sucesso");
     }
 
     private VBox createCenterContent() {
@@ -100,33 +103,22 @@ public class InterfaceGrafica extends Application {
         Label titleLabel = new Label("Extração Inteligente");
         titleLabel.setFont(Font.font("Inter", FontWeight.BOLD, 36));
         titleLabel.setTextFill(Color.valueOf(COLOR_TEXT_MAIN));
-
         Label subtitleLabel = new Label("Processe múltiplos PDFs de uma vez");
         subtitleLabel.setFont(Font.font("Inter", FontWeight.NORMAL, 16));
         subtitleLabel.setTextFill(Color.valueOf(COLOR_TEXT_DIM));
         header.getChildren().addAll(titleLabel, subtitleLabel);
 
-        // Drop Zone
         dropZone = createDropZone();
-
-        // Files info section
         VBox filesInfo = createFilesInfoSection();
 
-        // Action Buttons Row
         HBox actionBox = new HBox(15);
         actionBox.setAlignment(Pos.CENTER);
 
         Button selectPdfButton = createStyledButton("📄 Selecionar PDF(s)", COLOR_CARD, COLOR_TEXT_MAIN);
-        selectPdfButton.setOnAction(e -> {
-            System.out.println("DEBUG: Botão PDF clicado");
-            selectPDFFiles();
-        });
+        selectPdfButton.setOnAction(e -> selectPDFFiles());
 
         Button selectExcelButton = createStyledButton("📊 Selecionar Excel", COLOR_CARD, COLOR_TEXT_MAIN);
-        selectExcelButton.setOnAction(e -> {
-            System.out.println("DEBUG: Botão Excel clicado");
-            selectExcelFile();
-        });
+        selectExcelButton.setOnAction(e -> selectExcelFile());
 
         processButton = createStyledButton("🔍 Processar PDFs", COLOR_ACCENT, "#0F172A");
         processButton.setDisable(true);
@@ -141,12 +133,10 @@ public class InterfaceGrafica extends Application {
 
         actionBox.getChildren().addAll(selectPdfButton, selectExcelButton, processButton, exportButton, clearQueueButton);
 
-        // Status
         statusLabel = new Label("Pronto para iniciar");
         statusLabel.setTextFill(Color.valueOf(COLOR_TEXT_DIM));
         statusLabel.setFont(Font.font("Inter", FontWeight.MEDIUM, 14));
 
-        // Painel de edição dos dados
         editPanel = createEditPanel();
 
         container.getChildren().addAll(header, dropZone, filesInfo, actionBox, statusLabel, editPanel);
@@ -178,7 +168,7 @@ public class InterfaceGrafica extends Application {
 
     private VBox createEditPanel() {
         VBox panel = new VBox(12);
-        panel.setMaxWidth(900);
+        panel.setMaxWidth(950);
         panel.setPadding(new Insets(20));
         panel.setStyle("-fx-background-color: " + COLOR_CARD + "; -fx-background-radius: 15;");
         panel.setVisible(false);
@@ -188,68 +178,55 @@ public class InterfaceGrafica extends Application {
         titleLabel.setFont(Font.font("Inter", FontWeight.BOLD, 16));
         titleLabel.setTextFill(Color.valueOf(COLOR_TEXT_MAIN));
 
-        // NOVO: Seletor de PDF para edição
+        // Seletor de PDF
         HBox selectorBox = new HBox(10);
         selectorBox.setAlignment(Pos.CENTER_LEFT);
         Label selectorLabel = new Label("Selecionar PDF:");
         selectorLabel.setTextFill(Color.valueOf(COLOR_TEXT_MAIN));
         selectorLabel.setFont(Font.font("Inter", FontWeight.MEDIUM, 12));
-        
+
         seletorPDF = new ComboBox<>();
         seletorPDF.setStyle("-fx-background-color: " + COLOR_BG + "; -fx-text-fill: " + COLOR_TEXT_MAIN + ";");
-        seletorPDF.setPrefWidth(400);
+        seletorPDF.setPrefWidth(450);
         seletorPDF.setOnAction(e -> carregarDadosPDFSelecionado());
-        
+
         selectorBox.getChildren().addAll(selectorLabel, seletorPDF);
 
-        // Grid de campos
+        // Grid de campos gerais
         GridPane grid = new GridPane();
         grid.setHgap(15);
         grid.setVgap(12);
         grid.setPadding(new Insets(15, 0, 0, 0));
 
-        // Labels e TextFields
         Label labelNota = createFieldLabel("Número da Nota:");
         campoNumNota = createTextField();
-        
-        Label labelTotal = createFieldLabel("Valor Total:");
-        campoValorTotal = createTextField();
-        
+
         Label labelData = createFieldLabel("Data:");
         campoData = createTextField();
-        
+
         Label labelPlaca = createFieldLabel("Placa do Veículo:");
         campoPlaca = createTextField();
-        
+
         Label labelFornecedor = createFieldLabel("Fornecedor:");
         campoFornecedor = createTextField();
-        
-        // 👇 CAMPO UNIDADE
-        Label labelUnidade = createFieldLabel("Unidade:");
-        campoUnidade = createTextField();
-        
-        // 👇 NOVO CAMPO VALOR UNITÁRIO
-        Label labelValorUnitario = createFieldLabel("Valor Unitário:");
-        campoValorUnitario = createTextField();
 
-        grid.add(labelNota, 0, 0);
-        grid.add(campoNumNota, 1, 0);
-        grid.add(labelTotal, 0, 1);
-        grid.add(campoValorTotal, 1, 1);
-        grid.add(labelData, 0, 2);
-        grid.add(campoData, 1, 2);
-        grid.add(labelPlaca, 0, 3);
-        grid.add(campoPlaca, 1, 3);
-        grid.add(labelFornecedor, 0, 4);
-        grid.add(campoFornecedor, 1, 4);
-        grid.add(labelUnidade, 0, 5);
-        grid.add(campoUnidade, 1, 5);
-        grid.add(labelValorUnitario, 0, 6);  // 👈 ADICIONADO
-        grid.add(campoValorUnitario, 1, 6);   // 👈 ADICIONADO
+        grid.add(labelNota,       0, 0); grid.add(campoNumNota,   1, 0);
+        grid.add(labelData,       0, 1); grid.add(campoData,       1, 1);
+        grid.add(labelPlaca,      0, 2); grid.add(campoPlaca,      1, 2);
+        grid.add(labelFornecedor, 0, 3); grid.add(campoFornecedor, 1, 3);
 
-        // Área de produtos
-        Label labelProdutos = createFieldLabel("Produtos:");
+        // Botão salvar campos gerais
+        Button salvarGeralButton = createStyledButton("💾 Salvar Dados Gerais", COLOR_ACCENT, "#0F172A");
+        salvarGeralButton.setOnAction(e -> salvarDadosGerais());
+
+        // ── Seção de edição de produtos individualmente ──
+        Label labelProdutosTitle = new Label("📦 Produtos Extraídos");
+        labelProdutosTitle.setFont(Font.font("Inter", FontWeight.BOLD, 14));
+        labelProdutosTitle.setTextFill(Color.valueOf(COLOR_TEXT_MAIN));
+
+        // Lista visual dos produtos
         campoProdutos = new TextArea();
+        campoProdutos.setEditable(false);
         campoProdutos.setPrefRowCount(6);
         campoProdutos.setStyle(
             "-fx-control-inner-background: " + COLOR_BG + "; " +
@@ -258,11 +235,61 @@ public class InterfaceGrafica extends Application {
             "-fx-font-size: 11px;"
         );
 
-        // Botão para salvar edições do PDF atual
-        Button salvarEdicaoButton = createStyledButton("💾 Salvar Edições", COLOR_ACCENT, "#0F172A");
-        salvarEdicaoButton.setOnAction(e -> salvarEdicaoPDFAtual());
+        // Seletor de produto para edição
+        HBox produtoSelectorBox = new HBox(10);
+        produtoSelectorBox.setAlignment(Pos.CENTER_LEFT);
+        Label labelSeletorProduto = new Label("Editar produto nº:");
+        labelSeletorProduto.setTextFill(Color.valueOf(COLOR_TEXT_MAIN));
+        labelSeletorProduto.setFont(Font.font("Inter", FontWeight.MEDIUM, 12));
 
-        panel.getChildren().addAll(titleLabel, selectorBox, grid, labelProdutos, campoProdutos, salvarEdicaoButton);
+        seletorProduto = new ComboBox<>();
+        seletorProduto.setStyle("-fx-background-color: " + COLOR_BG + "; -fx-text-fill: " + COLOR_TEXT_MAIN + ";");
+        seletorProduto.setPrefWidth(250);
+        seletorProduto.setOnAction(e -> carregarCamposProduto());
+
+        produtoSelectorBox.getChildren().addAll(labelSeletorProduto, seletorProduto);
+
+        // Grid de edição de produto individual
+        GridPane gridProduto = new GridPane();
+        gridProduto.setHgap(15);
+        gridProduto.setVgap(10);
+        gridProduto.setPadding(new Insets(10, 0, 0, 0));
+
+        Label labelValorUnitario = createFieldLabel("Valor Unitário:");
+        campoValorUnitarioProduto = createTextField();
+        campoValorUnitarioProduto.setPromptText("Ex: 2,25");
+
+        Label labelUnidade = createFieldLabel("Unidade:");
+        campoUnidadeProduto = createTextField();
+        campoUnidadeProduto.setPromptText("Ex: UN, TON, KG");
+
+        Label labelQuantidade = createFieldLabel("Quantidade:");
+        campoQuantidadeProduto = createTextField();
+        campoQuantidadeProduto.setPromptText("Ex: 125");
+
+        gridProduto.add(labelValorUnitario,        0, 0); gridProduto.add(campoValorUnitarioProduto, 1, 0);
+        gridProduto.add(labelUnidade,              0, 1); gridProduto.add(campoUnidadeProduto,       1, 1);
+        gridProduto.add(labelQuantidade,           0, 2); gridProduto.add(campoQuantidadeProduto,    1, 2);
+
+        salvarProdutoButton = createStyledButton("💾 Salvar Produto", COLOR_SUCCESS, COLOR_TEXT_MAIN);
+        salvarProdutoButton.setDisable(true);
+        salvarProdutoButton.setOnAction(e -> salvarEdicaoProduto());
+
+        Separator sep = new Separator();
+        sep.setStyle("-fx-background-color: #334155;");
+
+        panel.getChildren().addAll(
+            titleLabel,
+            selectorBox,
+            grid,
+            salvarGeralButton,
+            sep,
+            labelProdutosTitle,
+            campoProdutos,
+            produtoSelectorBox,
+            gridProduto,
+            salvarProdutoButton
+        );
         return panel;
     }
 
@@ -290,7 +317,6 @@ public class InterfaceGrafica extends Application {
 
         dropBox.getChildren().addAll(dropLabel, hintLabel);
 
-        // Drag and drop
         dropBox.setOnDragOver(event -> {
             if (event.getDragboard().hasFiles()) {
                 event.acceptTransferModes(TransferMode.COPY);
@@ -302,8 +328,7 @@ public class InterfaceGrafica extends Application {
             var dragboard = event.getDragboard();
             boolean success = false;
             if (dragboard.hasFiles()) {
-                List<File> arquivos = dragboard.getFiles();
-                for (File arquivo : arquivos) {
+                for (File arquivo : dragboard.getFiles()) {
                     if (arquivo.getName().toLowerCase().endsWith(".pdf")) {
                         if (!pdfFiles.contains(arquivo)) {
                             pdfFiles.add(arquivo);
@@ -354,8 +379,7 @@ public class InterfaceGrafica extends Application {
             "-fx-padding: 12 24 12 24; " +
             "-fx-cursor: hand;"
         );
-        
-        button.setOnMouseEntered(e -> 
+        button.setOnMouseEntered(e ->
             button.setStyle(
                 "-fx-background-color: derive(" + bgColor + ", 10%); " +
                 "-fx-text-fill: " + textColor + "; " +
@@ -364,8 +388,7 @@ public class InterfaceGrafica extends Application {
                 "-fx-cursor: hand;"
             )
         );
-        
-        button.setOnMouseExited(e -> 
+        button.setOnMouseExited(e ->
             button.setStyle(
                 "-fx-background-color: " + bgColor + "; " +
                 "-fx-text-fill: " + textColor + "; " +
@@ -374,7 +397,6 @@ public class InterfaceGrafica extends Application {
                 "-fx-cursor: hand;"
             )
         );
-        
         return button;
     }
 
@@ -403,21 +425,18 @@ public class InterfaceGrafica extends Application {
         fileChooser.getExtensionFilters().add(
             new FileChooser.ExtensionFilter("PDF Files", "*.pdf")
         );
-        
+
         List<File> selectedFiles = fileChooser.showOpenMultipleDialog(primaryStage);
-        
+
         if (selectedFiles != null && !selectedFiles.isEmpty()) {
             for (File file : selectedFiles) {
                 if (!pdfFiles.contains(file)) {
                     pdfFiles.add(file);
                 }
             }
-            
             atualizarLabelPDFs();
             verificarBotoes();
-            
             logMessage("📄 " + selectedFiles.size() + " PDF(s) adicionado(s) à fila");
-            System.out.println("DEBUG: " + pdfFiles.size() + " PDFs na fila total");
         }
     }
 
@@ -427,15 +446,14 @@ public class InterfaceGrafica extends Application {
         fileChooser.getExtensionFilters().add(
             new FileChooser.ExtensionFilter("Excel Files", "*.xlsx", "*.xls")
         );
-        
+
         File selectedFile = fileChooser.showOpenDialog(primaryStage);
-        
+
         if (selectedFile != null) {
             excelFile = selectedFile;
             excelFileLabel.setText("Excel: " + excelFile.getName());
             verificarBotoes();
             logMessage("📊 Excel selecionado: " + excelFile.getName());
-            System.out.println("DEBUG: Excel selecionado: " + excelFile.getAbsolutePath());
         }
     }
 
@@ -450,13 +468,9 @@ public class InterfaceGrafica extends Application {
     private void verificarBotoes() {
         boolean temPDFs = !pdfFiles.isEmpty();
         boolean temExcel = excelFile != null;
-        
+
         processButton.setDisable(!temPDFs);
         exportButton.setDisable(dadosProcessados.isEmpty() || !temExcel);
-        
-        System.out.println("DEBUG: verificarBotoes() - PDFs: " + pdfFiles.size() + 
-                         ", Excel: " + (excelFile != null ? "sim" : "não") + 
-                         ", Processados: " + dadosProcessados.size());
     }
 
     private void processarTodosPDFs() {
@@ -480,7 +494,7 @@ public class InterfaceGrafica extends Application {
                 for (File pdfFile : pdfFiles) {
                     processados++;
                     final int numAtual = processados;
-                    
+
                     Platform.runLater(() -> {
                         logMessage("\n═══════════════════════════════════════");
                         logMessage("🔍 Processando PDF " + numAtual + "/" + total);
@@ -490,25 +504,25 @@ public class InterfaceGrafica extends Application {
 
                     DadosPDF dadosPDF = processarUmPDF(pdfFile);
                     dadosProcessados.add(dadosPDF);
-                    
-                    Platform.runLater(() -> {
-                        seletorPDF.getItems().add("PDF " + numAtual + ": " + pdfFile.getName());
-                    });
+
+                    Platform.runLater(() ->
+                        seletorPDF.getItems().add("PDF " + numAtual + ": " + pdfFile.getName())
+                    );
                 }
 
                 Platform.runLater(() -> {
                     logMessage("\n✅ Processamento completo! " + dadosProcessados.size() + " PDF(s) processado(s)");
                     statusLabel.setText("✅ Processamento concluído!");
                     statusLabel.setTextFill(Color.valueOf(COLOR_SUCCESS));
-                    
+
                     editPanel.setVisible(true);
                     editPanel.setManaged(true);
-                    
+
                     if (!seletorPDF.getItems().isEmpty()) {
                         seletorPDF.getSelectionModel().select(0);
                         carregarDadosPDFSelecionado();
                     }
-                    
+
                     exportButton.setDisable(false);
                     processButton.setDisable(false);
                 });
@@ -520,7 +534,7 @@ public class InterfaceGrafica extends Application {
                     statusLabel.setText("❌ Erro no processamento");
                     statusLabel.setTextFill(Color.valueOf("#EF4444"));
                     processButton.setDisable(false);
-                    
+
                     Alert alert = new Alert(Alert.AlertType.ERROR);
                     alert.setTitle("Erro");
                     alert.setHeaderText("Erro ao processar PDFs");
@@ -533,168 +547,183 @@ public class InterfaceGrafica extends Application {
 
     private DadosPDF processarUmPDF(File pdfFile) {
         DadosPDF dadosPDF = new DadosPDF(pdfFile.getName());
-        
+
         try {
             PdfLeitor leitor = new PdfLeitor();
             String textoParaRegex = leitor.ExtractText(pdfFile.getAbsolutePath());
-            
+
             if (textoParaRegex != null && !textoParaRegex.isEmpty()) {
                 PdfColetorDados coletor = new PdfColetorDados();
-                
+
                 dadosPDF.setNumNota(coletor.ExtractDanfeNumber(textoParaRegex));
                 Platform.runLater(() -> logMessage("  📋 Nota: " + dadosPDF.getNumNota()));
-                
-                dadosPDF.setValorTotal(coletor.ExtractTotalNumber(textoParaRegex));
-                Platform.runLater(() -> logMessage("  💰 Total: " + dadosPDF.getValorTotal()));
-                
+
                 dadosPDF.setPlacaVeiculo(coletor.ExtracPlacaVeiculo(textoParaRegex));
                 Platform.runLater(() -> logMessage("  🚗 Placa: " + dadosPDF.getPlacaVeiculo()));
-                
+
                 dadosPDF.setFornecedor(coletor.ExtractRazaoSocial(textoParaRegex));
                 Platform.runLater(() -> logMessage("  🏢 Fornecedor: " + dadosPDF.getFornecedor()));
-                
+
                 dadosPDF.setData(coletor.ExtractDate(textoParaRegex));
                 Platform.runLater(() -> logMessage("  📅 Data: " + dadosPDF.getData()));
-                
-                
+
                 ColetorProdutos coletorProdutos = new ColetorProdutos();
                 List<Produto> produtos = coletorProdutos.extrairTabelaPDF(pdfFile.getAbsolutePath());
-                
+
                 if (produtos == null || produtos.isEmpty()) {
                     produtos = new ArrayList<>();
                     Platform.runLater(() -> logMessage("  ⚠️ Nenhum produto encontrado"));
                 } else {
                     final int totalProdutos = produtos.size();
                     Platform.runLater(() -> logMessage("  ✅ " + totalProdutos + " produto(s) encontrado(s)"));
-                    
-                    // 👇 EXTRAIR UNIDADE E VALOR UNITÁRIO DO PRIMEIRO PRODUTO
-                    if (!produtos.isEmpty()) {
-                        Produto primeiroProduto = produtos.get(0);
-                        
-                        if (primeiroProduto.unidade != null) {
-                            String unidade = primeiroProduto.unidade;
-                            dadosPDF.setUnidade(unidade);
-                            Platform.runLater(() -> logMessage("  📦 Unidade: " + unidade));
-                        }
-                        
-                        if (primeiroProduto.valorUnitario != null) {
-                            String valorUnit = primeiroProduto.valorUnitario;
-                            dadosPDF.setValorUnitario(valorUnit);
-                            Platform.runLater(() -> logMessage("  💵 Valor Unitário: R$ " + valorUnit));
-                        }
-                    }
                 }
-                
+
                 dadosPDF.setListaDeProdutos(produtos);
             }
-            
+
         } catch (Exception e) {
             Platform.runLater(() -> {
                 logMessage("  ❌ Erro ao processar: " + e.getMessage());
                 e.printStackTrace();
             });
         }
-        
+
         return dadosPDF;
     }
 
-    // 👇 ATUALIZADO: agora carrega unidade e valor unitário separadamente
+    /**
+     * Carrega os campos gerais e a lista de produtos do PDF selecionado.
+     */
     private void carregarDadosPDFSelecionado() {
         int index = seletorPDF.getSelectionModel().getSelectedIndex();
         if (index >= 0 && index < dadosProcessados.size()) {
             pdfAtualIndex = index;
             DadosPDF dados = dadosProcessados.get(index);
-            
+
             campoNumNota.setText(dados.getNumNota() != null ? dados.getNumNota() : "");
-            campoValorTotal.setText(dados.getValorTotal() != null ? dados.getValorTotal() : "");
             campoData.setText(dados.getData() != null ? dados.getData() : "");
             campoPlaca.setText(dados.getPlacaVeiculo() != null ? dados.getPlacaVeiculo() : "");
             campoFornecedor.setText(dados.getFornecedor() != null ? dados.getFornecedor() : "");
-            campoUnidade.setText(dados.getUnidade() != null ? dados.getUnidade() : "");
-            campoValorUnitario.setText(dados.getValorUnitario() != null ? dados.getValorUnitario() : "");  // 👈 NOVO
-            
-            // 👇 ATUALIZADO: Produtos SOMENTE com descrição
+
+            // Atualiza lista visual de produtos
+            atualizarListaProdutos(dados);
+
+            // Atualiza seletor de produto
+            seletorProduto.getItems().clear();
+            seletorProduto.setValue(null);
+            campoValorUnitarioProduto.clear();
+            campoUnidadeProduto.clear();
+            campoQuantidadeProduto.clear();
+            salvarProdutoButton.setDisable(true);
+
             if (dados.getListaDeProdutos() != null && !dados.getListaDeProdutos().isEmpty()) {
-                StringBuilder sb = new StringBuilder();
                 for (int i = 0; i < dados.getListaDeProdutos().size(); i++) {
                     Produto p = dados.getListaDeProdutos().get(i);
-                    sb.append(String.format("[%d] %s\n", 
-                        i + 1, p.descricao));
+                    String label = "[" + (i + 1) + "] " + truncar(p.descricao, 40);
+                    seletorProduto.getItems().add(label);
                 }
-                campoProdutos.setText(sb.toString());
-            } else {
-                campoProdutos.setText("Nenhum produto encontrado");
+                seletorProduto.getSelectionModel().select(0);
+                carregarCamposProduto();
             }
-            
+
             logMessage("\n📝 Carregado para edição: " + dados.getNomePDF());
         }
     }
 
-    private void salvarEdicaoPDFAtual() {
+    /**
+     * Atualiza a TextArea com a lista de produtos do PDF atual.
+     */
+    private void atualizarListaProdutos(DadosPDF dados) {
+        if (dados.getListaDeProdutos() != null && !dados.getListaDeProdutos().isEmpty()) {
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < dados.getListaDeProdutos().size(); i++) {
+                Produto p = dados.getListaDeProdutos().get(i);
+                sb.append(String.format("[%d] %s\n    Unid: %s | Qtd: %s | Vlr Unit: R$ %s\n\n",
+                    i + 1,
+                    p.descricao != null ? p.descricao : "—",
+                    p.unidade != null ? p.unidade : "—",
+                    p.quantidade != null && !p.quantidade.isEmpty() ? p.quantidade : "—",
+                    p.valorUnitario != null ? p.valorUnitario : "—"
+                ));
+            }
+            campoProdutos.setText(sb.toString());
+        } else {
+            campoProdutos.setText("Nenhum produto encontrado");
+        }
+    }
+
+    /**
+     * Carrega os campos de edição com os dados do produto selecionado no seletorProduto.
+     */
+    private void carregarCamposProduto() {
+        if (pdfAtualIndex < 0 || pdfAtualIndex >= dadosProcessados.size()) return;
+
+        int prodIdx = seletorProduto.getSelectionModel().getSelectedIndex();
+        if (prodIdx < 0) return;
+
+        DadosPDF dados = dadosProcessados.get(pdfAtualIndex);
+        if (dados.getListaDeProdutos() == null || prodIdx >= dados.getListaDeProdutos().size()) return;
+
+        Produto p = dados.getListaDeProdutos().get(prodIdx);
+
+        campoValorUnitarioProduto.setText(p.valorUnitario != null ? p.valorUnitario : "");
+        campoUnidadeProduto.setText(p.unidade != null ? p.unidade : "");
+        campoQuantidadeProduto.setText(p.quantidade != null ? p.quantidade : "");
+
+        salvarProdutoButton.setDisable(false);
+    }
+
+    /**
+     * Salva as edições nos dados gerais do PDF atual (nota, data, placa, fornecedor).
+     */
+    private void salvarDadosGerais() {
         if (pdfAtualIndex >= 0 && pdfAtualIndex < dadosProcessados.size()) {
             DadosPDF dados = dadosProcessados.get(pdfAtualIndex);
-            
+
             dados.setNumNota(campoNumNota.getText());
-            dados.setValorTotal(campoValorTotal.getText());
             dados.setData(campoData.getText());
             dados.setPlacaVeiculo(campoPlaca.getText());
             dados.setFornecedor(campoFornecedor.getText());
-            dados.setUnidade(campoUnidade.getText());
-            dados.setValorUnitario(campoValorUnitario.getText());
-            
-            // 👇 PARSE DOS PRODUTOS EDITADOS
-            String textoProdutos = campoProdutos.getText();
-            if (textoProdutos != null && !textoProdutos.trim().isEmpty() && 
-                !textoProdutos.equals("Nenhum produto encontrado")) {
-                
-                List<Produto> produtosEditados = parsearProdutos(textoProdutos);
-                dados.setListaDeProdutos(produtosEditados);
-                
-                logMessage("✅ " + produtosEditados.size() + " produto(s) atualizado(s)");
-            }
-            
-            logMessage("✅ Edições salvas para: " + dados.getNomePDF());
-            
+
+            logMessage("✅ Dados gerais salvos para: " + dados.getNomePDF());
+
             Alert alert = new Alert(Alert.AlertType.INFORMATION);
             alert.setTitle("Salvo");
-            alert.setHeaderText("Edições salvas!");
-            alert.setContentText("As alterações foram salvas para: " + dados.getNomePDF());
+            alert.setHeaderText("Dados gerais salvos!");
+            alert.setContentText("Alterações salvas para: " + dados.getNomePDF());
             alert.showAndWait();
         }
     }
-    
+
     /**
-     * Faz o parse do texto editado de produtos
-     * Formato esperado: [1] NOME DO PRODUTO
+     * Salva as edições de um produto individual (valorUnitario, unidade, quantidade).
      */
-    private List<Produto> parsearProdutos(String textoProdutos) {
-        List<Produto> produtos = new ArrayList<>();
-        
-        // Separa por linhas
-        String[] linhas = textoProdutos.split("\n");
-        
-        for (String linha : linhas) {
-            linha = linha.trim();
-            
-            // Ignora linhas vazias
-            if (linha.isEmpty()) {
-                continue;
-            }
-            
-            // Remove o índice [1], [2], etc. e pega só a descrição
-            // Padrão: [número] descrição
-            String descricao = linha.replaceFirst("^\\[\\d+\\]\\s*", "").trim();
-            
-            // Se ainda tem conteúdo após remover o índice
-            if (!descricao.isEmpty()) {
-                // Cria produto com descrição editada
-                // valorUnitario e unidade virão dos campos separados
-                Produto p = new Produto(descricao, "", "");
-                produtos.add(p);
-            }
-        }
-        
-        return produtos;
+    private void salvarEdicaoProduto() {
+        if (pdfAtualIndex < 0 || pdfAtualIndex >= dadosProcessados.size()) return;
+
+        int prodIdx = seletorProduto.getSelectionModel().getSelectedIndex();
+        if (prodIdx < 0) return;
+
+        DadosPDF dados = dadosProcessados.get(pdfAtualIndex);
+        if (dados.getListaDeProdutos() == null || prodIdx >= dados.getListaDeProdutos().size()) return;
+
+        Produto p = dados.getListaDeProdutos().get(prodIdx);
+        p.valorUnitario = campoValorUnitarioProduto.getText().trim();
+        p.unidade = campoUnidadeProduto.getText().trim();
+        p.quantidade = campoQuantidadeProduto.getText().trim();
+
+        // Atualiza lista visual
+        atualizarListaProdutos(dados);
+
+        logMessage("✅ Produto [" + (prodIdx + 1) + "] atualizado: "
+            + truncar(p.descricao, 30)
+            + " | " + p.unidade + " | qtd: " + p.quantidade + " | R$ " + p.valorUnitario);
+
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Salvo");
+        alert.setHeaderText("Produto atualizado!");
+        alert.setContentText("Produto [" + (prodIdx + 1) + "] " + truncar(p.descricao, 40) + " salvo com sucesso.");
+        alert.showAndWait();
     }
 
     private void exportarParaExcel() {
@@ -702,7 +731,7 @@ public class InterfaceGrafica extends Application {
             logMessage("⚠️ Nenhum dado para exportar!");
             return;
         }
-        
+
         if (excelFile == null) {
             logMessage("⚠️ Nenhum arquivo Excel selecionado!");
             return;
@@ -713,9 +742,9 @@ public class InterfaceGrafica extends Application {
         statusLabel.setTextFill(Color.valueOf(COLOR_WARNING));
 
         ExportadorExcel exporter = new ExportadorExcel();
-        
+
         SeletorDeAbas.selecionarAbaAsync(
-            exporter, 
+            exporter,
             excelFile.getAbsolutePath(),
             new SeletorDeAbas.SelecionarAbaCallback() {
                 @Override
@@ -725,33 +754,30 @@ public class InterfaceGrafica extends Application {
                             logMessage("\n📤 Iniciando exportação para Excel...");
                             logMessage("📁 Caminho: " + excelFile.getAbsolutePath());
                             logMessage("📋 Aba destino: " + nomeAba);
-                            
+
                             int totalProdutosExportados = 0;
-                            
+
                             for (DadosPDF dados : dadosProcessados) {
                                 logMessage("\n📄 Exportando: " + dados.getNomePDF());
                                 logMessage("   Nota: " + dados.getNumNota());
                                 logMessage("   Produtos: " + (dados.getListaDeProdutos() != null ? dados.getListaDeProdutos().size() : 0));
-                                
+
                                 if (dados.getListaDeProdutos() != null && !dados.getListaDeProdutos().isEmpty()) {
                                     exporter.ExportDataTOExcel(
                                         excelFile.getAbsolutePath(),
                                         nomeAba,
                                         dados.getNumNota(),
-                                        dados.getValorTotal(),
                                         dados.getData(),
                                         dados.getPlacaVeiculo(),
                                         dados.getFornecedor(),
-                                        dados.getUnidade(),           // 👈 NOVO
-                                        dados.getValorUnitario(),     // 👈 NOVO
                                         dados.getListaDeProdutos()
                                     );
                                     totalProdutosExportados += dados.getListaDeProdutos().size();
                                 }
                             }
-                            
+
                             final int totalFinal = totalProdutosExportados;
-                            
+
                             Platform.runLater(() -> {
                                 logMessage("\n✅ Exportação completa!");
                                 logMessage("📊 Total de produtos exportados: " + totalFinal);
@@ -759,7 +785,7 @@ public class InterfaceGrafica extends Application {
                                 logMessage("💾 Arquivo: " + excelFile.getAbsolutePath());
                                 statusLabel.setText("✅ Exportação concluída!");
                                 statusLabel.setTextFill(Color.valueOf(COLOR_SUCCESS));
-                                
+
                                 Alert alert = new Alert(Alert.AlertType.INFORMATION);
                                 alert.setTitle("Sucesso");
                                 alert.setHeaderText("✅ Exportação concluída!");
@@ -770,7 +796,7 @@ public class InterfaceGrafica extends Application {
                                     "Arquivo: " + excelFile.getName()
                                 );
                                 alert.showAndWait();
-                                
+
                                 exportButton.setDisable(false);
                             });
 
@@ -780,36 +806,36 @@ public class InterfaceGrafica extends Application {
                                 e.printStackTrace();
                                 statusLabel.setText("❌ Falha na exportação");
                                 statusLabel.setTextFill(Color.valueOf("#EF4444"));
-                                
+
                                 Alert alert = new Alert(Alert.AlertType.ERROR);
                                 alert.setTitle("Erro");
                                 alert.setHeaderText("❌ Falha ao exportar");
                                 alert.setContentText("Erro: " + e.getMessage());
                                 alert.showAndWait();
-                                
+
                                 exportButton.setDisable(false);
                             });
                         }
                     }).start();
                 }
-                
+
                 @Override
                 public void onErro(String mensagem) {
                     Platform.runLater(() -> {
                         logMessage("❌ Erro ao listar abas: " + mensagem);
                         statusLabel.setText("❌ Erro ao acessar Excel");
                         statusLabel.setTextFill(Color.valueOf("#EF4444"));
-                        
+
                         Alert alert = new Alert(Alert.AlertType.ERROR);
                         alert.setTitle("Erro");
                         alert.setHeaderText("❌ Erro ao acessar Excel");
                         alert.setContentText(mensagem);
                         alert.showAndWait();
-                        
+
                         exportButton.setDisable(false);
                     });
                 }
-                
+
                 @Override
                 public void onCancelado() {
                     Platform.runLater(() -> {
@@ -824,13 +850,10 @@ public class InterfaceGrafica extends Application {
     }
 
     private void logMessage(String message) {
-        Platform.runLater(() -> {
-            logArea.appendText(message + "\n");
-        });
+        Platform.runLater(() -> logArea.appendText(message + "\n"));
     }
 
     private void limparFila() {
-        // Cria um diálogo de confirmação
         Alert confirmacao = new Alert(Alert.AlertType.CONFIRMATION);
         confirmacao.setTitle("Confirmar Limpeza");
         confirmacao.setHeaderText("Limpar Fila de PDFs?");
@@ -841,62 +864,58 @@ public class InterfaceGrafica extends Application {
             "Deseja continuar?"
         );
 
-        // Configura os botões
         ButtonType botaoSim = new ButtonType("Sim, Limpar", ButtonBar.ButtonData.OK_DONE);
         ButtonType botaoNao = new ButtonType("Cancelar", ButtonBar.ButtonData.CANCEL_CLOSE);
         confirmacao.getButtonTypes().setAll(botaoSim, botaoNao);
 
-        // Mostra o diálogo e aguarda resposta
         confirmacao.showAndWait().ifPresent(resposta -> {
             if (resposta == botaoSim) {
-                // Limpa todos os arrays e dados
                 pdfFiles.clear();
                 dadosProcessados.clear();
                 pdfAtualIndex = -1;
-                
-                // Limpa o ComboBox de seleção de PDFs
+
                 if (seletorPDF != null) {
                     seletorPDF.getItems().clear();
                     seletorPDF.setValue(null);
                 }
-                
-                // Limpa os campos de edição
+                if (seletorProduto != null) {
+                    seletorProduto.getItems().clear();
+                    seletorProduto.setValue(null);
+                }
+
                 if (campoNumNota != null) campoNumNota.clear();
-                if (campoValorTotal != null) campoValorTotal.clear();
                 if (campoData != null) campoData.clear();
                 if (campoPlaca != null) campoPlaca.clear();
                 if (campoFornecedor != null) campoFornecedor.clear();
-                if (campoUnidade != null) campoUnidade.clear();
-                if (campoValorUnitario != null) campoValorUnitario.clear();  // 👈 LIMPA VALOR UNITÁRIO
+                if (campoValorUnitarioProduto != null) campoValorUnitarioProduto.clear();
+                if (campoUnidadeProduto != null) campoUnidadeProduto.clear();
+                if (campoQuantidadeProduto != null) campoQuantidadeProduto.clear();
                 if (campoProdutos != null) campoProdutos.clear();
-                
-                // Esconde o painel de edição
+                if (salvarProdutoButton != null) salvarProdutoButton.setDisable(true);
+
                 if (editPanel != null) {
                     editPanel.setVisible(false);
                     editPanel.setManaged(false);
                 }
-                
-                // Atualiza os labels de arquivos
+
                 pdfFilesLabel.setText("PDFs: Nenhum arquivo selecionado");
-                
-                // Desabilita os botões de processar e exportar
                 processButton.setDisable(true);
                 exportButton.setDisable(true);
-                
-                // Atualiza o status
+
                 statusLabel.setText("Fila limpa - Pronto para começar novamente");
                 statusLabel.setTextFill(Color.valueOf(COLOR_TEXT_DIM));
-                
-                // Limpa o log
+
                 logArea.clear();
                 logMessage("🗑️ Fila limpa com sucesso!");
                 logMessage("✅ Sistema pronto para processar novos PDFs.");
-                
-                System.out.println("DEBUG: Fila limpa - Arrays zerados");
-                System.out.println("  pdfFiles.size() = " + pdfFiles.size());
-                System.out.println("  dadosProcessados.size() = " + dadosProcessados.size());
             }
         });
+    }
+
+    /** Trunca string para exibição no ComboBox/Label */
+    private String truncar(String s, int maxLen) {
+        if (s == null) return "";
+        return s.length() > maxLen ? s.substring(0, maxLen) + "…" : s;
     }
 
     public static void main(String[] args) {
