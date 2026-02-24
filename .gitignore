@@ -1,1 +1,9 @@
 /MgtBolina_project/target/
+/instalador
+/runtime
+/app
+/jpackage
+*.zip
+*.exe
+*.msi
+*.jar
