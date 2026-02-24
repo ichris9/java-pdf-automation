@@ -183,43 +183,50 @@ public class ColetorProdutos {
             
             String linhaUpper = linha.toUpperCase();
             if (linhaUpper.contains("CÓD") || linhaUpper.contains("DESCRIÇÃO") ||
-                linhaUpper.contains("PRODUTO") || linhaUpper.contains("NCM") ||
+                linhaUpper.contains("NCM") ||
                 linhaUpper.contains("CST") || linhaUpper.contains("CFOP") ||
                 linhaUpper.contains("ALIQ") || linhaUpper.contains("BASE") ||
-                linhaUpper.contains("CÁLCULO") || linhaUpper.contains("ICMS")) {
+                linhaUpper.contains("CÁLCULO")) {
                 System.out.println("  [Rejeitado]: parece cabeçalho");
                 return null;
             }
             
-            // Exemplo: "4776 BICA FINA DE GRANITO 25171000 000 5.101 TON 38,420 50,00 1.921,00"
+            // ─────────────────────────────────────────────────────────────────
+            // ESTRATÉGIA: ancoragem no NCM (bloco de 8 dígitos isolado)
+            // Isso resolve todos os casos problemáticos:
+            //   • Ventilar: "SACO P/ ENTULHO 50KGS UNIDADE LOTE: 01 63053390 000 5102 UN ..."
+            //   • Ferrari:  "9005 MARGI. BRILHO BR 16048 TOMADA 2P+T N.P.B 20A 250V MODULO 85366910 ..."
+            // O NCM separa de forma precisa onde a descrição termina e os dados numéricos começam.
+            // ─────────────────────────────────────────────────────────────────
             
-            // Padrão 1: Específico para DANFEs (com UNID) 👈
+            // Padrão 1 (PRINCIPAL): âncora no NCM de 8 dígitos
             Pattern pattern1 = Pattern.compile(
-                "^(\\d+)\\s+" +
-                "([A-ZÀ-Ú][A-ZÀ-Úa-zà-ú0-9\\s/\\-\\.]+?)\\s+" +
-                "\\d{8}\\s+" +
-                "\\d{3}\\s+" +
-                "[\\d\\.]+\\s+" +
-                "([A-Z0-9]{1,6})\\s+" +         // 👈 UNID (TON, KG, UN, M3, etc)
-                "[\\d,]+\\s+" +
-                "(\\d{1,3}(?:\\.\\d{3})*,\\d{2})\\s+" +
-                "(\\d{1,3}(?:\\.\\d{3})*,\\d{2})"
+                "^(\\d+)\\s+" +                              // código
+                "(.+?)\\s+" +                                // descrição — lazy, qualquer coisa
+                "(\\d{8})\\s+" +                             // NCM (âncora — 8 dígitos exatos)
+                "\\d{3}\\s+" +                               // CST
+                "[\\d\\.]+\\s+" +                            // CFOP
+                "([A-Z]{1,5}\\d{0,2})\\s+" +                 // UNID (PC, UN, TON, M3, etc)
+                "[\\d,\\.]+\\s+" +                           // QUANT
+                "(\\d{1,3}(?:\\.\\d{3})*,\\d{2,4})\\s+" +   // V.UNIT (aceita 2-4 casas: 2,2500)
+                "(\\d{1,3}(?:\\.\\d{3})*,\\d{2})"           // V.TOTAL
             );
             
-            // Padrão 2: Flexível com unidade
+            // Padrão 2 (FLEXÍVEL): NCM com 6-8 dígitos para outros layouts
             Pattern pattern2 = Pattern.compile(
                 "^(\\d+)\\s+" +
-                "([A-ZÀ-Ú][A-ZÀ-Úa-zà-ú0-9\\s/\\-\\.]+?)\\s+" +
-                ".*?\\s([A-Z0-9]{1,6})\\s+" +   // 👈 UNID
-                ".*?" +
-                "(\\d{1,3}(?:\\.\\d{3})*,\\d{2})\\s+" +
+                "(.+?)\\s+" +
+                "(\\d{6,8})\\s+\\d{3}\\s+[\\d\\.]+\\s+" +  // NCM+CST+CFOP
+                "([A-Z]{1,5}\\d{0,2})\\s+" +
+                "[\\d,\\.]+\\s+" +
+                "(\\d{1,3}(?:\\.\\d{3})*,\\d{2,4})\\s+" +
                 "(\\d{1,3}(?:\\.\\d{3})*,\\d{2})"
             );
             
-            // Padrão 3: Fallback sem unidade
+            // Padrão 3 (FALLBACK): sem unidade
             Pattern pattern3 = Pattern.compile(
                 "^(\\d+)\\s+" +
-                "([A-ZÀ-Ú][A-ZÀ-Úa-zà-ú0-9\\s/\\-\\.]+?)\\s+" +
+                "(.+?)\\s+" +
                 ".*?" +
                 "(\\d{1,3}(?:\\.\\d{3})*,\\d{2})\\s+" +
                 "(\\d{1,3}(?:\\.\\d{3})*,\\d{2})"
@@ -232,48 +239,48 @@ public class ColetorProdutos {
             // Tenta padrão 1 (com unidade)
             if (m1.find()) {
                 String codigo = m1.group(1);
-                String descricao = m1.group(2).trim();
-                String unidade = m1.group(3);      // 👈
-                String valorUnit = m1.group(4);
-                String valorTotal = m1.group(5);
+                String descricao = limparDescricao(m1.group(2).trim());
+                String unidade = m1.group(4);
+                String valorUnit = normalizarValorUnitario(m1.group(5));
+                String valorTotal = m1.group(6);
                 
                 System.out.println("  [Match padrão 1 - COM UNIDADE!]");
                 System.out.println("    Código: " + codigo);
                 System.out.println("    Descrição: " + descricao);
-                System.out.println("    Unidade: " + unidade);  // 👈
+                System.out.println("    Unidade: " + unidade);
                 System.out.println("    V.Unit: " + valorUnit);
                 System.out.println("    V.Total: " + valorTotal);
                 
                 if (isProdutoValido(codigo, descricao, valorUnit)) {
                     System.out.println("  [PRODUTO VÁLIDO!]");
-                    return new Produto(descricao, valorUnit, unidade);  // 👈
+                    return new Produto(descricao, valorUnit, unidade);
                 }
             }
             // Tenta padrão 2 (flexível com unidade)
             else if (m2.find()) {
                 String codigo = m2.group(1);
-                String descricao = m2.group(2).trim();
-                String unidade = m2.group(3);      // 👈
-                String valorUnit = m2.group(4);
-                String valorTotal = m2.group(5);
+                String descricao = limparDescricao(m2.group(2).trim());
+                String unidade = m2.group(4);
+                String valorUnit = normalizarValorUnitario(m2.group(5));
+                String valorTotal = m2.group(6);
                 
                 System.out.println("  [Match padrão 2 - COM UNIDADE!]");
                 System.out.println("    Código: " + codigo);
                 System.out.println("    Descrição: " + descricao);
-                System.out.println("    Unidade: " + unidade);  // 👈
+                System.out.println("    Unidade: " + unidade);
                 System.out.println("    V.Unit: " + valorUnit);
                 System.out.println("    V.Total: " + valorTotal);
                 
                 if (isProdutoValido(codigo, descricao, valorUnit)) {
                     System.out.println("  [PRODUTO VÁLIDO!]");
-                    return new Produto(descricao, valorUnit, unidade);  // 👈
+                    return new Produto(descricao, valorUnit, unidade);
                 }
             }
             // Tenta padrão 3 (fallback SEM unidade - usa "UN")
             else if (m3.find()) {
                 String codigo = m3.group(1);
-                String descricao = m3.group(2).trim();
-                String valorUnit = m3.group(3);
+                String descricao = limparDescricao(m3.group(2).trim());
+                String valorUnit = normalizarValorUnitario(m3.group(3));
                 String valorTotal = m3.group(4);
                 
                 System.out.println("  [Match padrão 3 - SEM unidade (usa UN)]");
@@ -371,7 +378,7 @@ public class ColetorProdutos {
             }
             
             String valorLimpo = limparValor(valorUnitario);
-            if (!valorLimpo.matches("\\d+,\\d{2}") && !valorLimpo.matches("\\d+\\.\\d+,\\d{2}")) {
+            if (!valorLimpo.matches("\\d+,\\d{2,4}") && !valorLimpo.matches("\\d+\\.\\d+,\\d{2,4}")) {
                 System.out.println("    ✗ Valor unitário inválido: " + valorLimpo);
                 return false;
             }
@@ -393,6 +400,39 @@ public class ColetorProdutos {
     private String limparValor(String valor) {
         if (valor == null) return "";
         return valor.replaceAll("[^0-9,.]", "").trim();
+    }
+    
+    /**
+     * Limpa textos extras que o Tabula injeta na descrição:
+     *   - "LOTE: 01" (Ventilar e outros)
+     *   - "IMPOSTO RECOLHIDO POR SUBSTITUICAO..." (Ventilar produto 2)
+     *   - "SEPARADOS" isolado no final (Ferrari)
+     */
+    private String limparDescricao(String desc) {
+        if (desc == null) return "";
+        desc = desc
+            .replaceAll("(?i)\\s+LOTE:\\s*\\d+.*$", "")
+            .replaceAll("(?i)\\s+IMPOSTO\\s+RECOLHIDO.*$", "")
+            .replaceAll("(?i)\\s+RICMS.*$", "")
+            .replaceAll("(?i)\\s+TRIBUTARIA.*$", "")
+            .replaceAll("(?i)\\bSEPARADOS\\b\\s*$", "")
+            .trim();
+        return desc;
+    }
+    
+    /**
+     * Normaliza valor unitário: converte 4 casas decimais para 2 (ex: 2,2500 → 2,25)
+     * Também trata casos como 187,0602 → 187,06
+     */
+    private String normalizarValorUnitario(String valor) {
+        if (valor == null) return "";
+        valor = valor.trim();
+        // Se tem mais de 2 casas decimais, trunca para 2
+        if (valor.matches("\\d{1,3}(?:\\.\\d{3})*,\\d{3,}")) {
+            int virgula = valor.lastIndexOf(',');
+            return valor.substring(0, virgula + 3); // mantém 2 casas após vírgula
+        }
+        return valor;
     }
     
     private String normalizarTexto(String texto) {

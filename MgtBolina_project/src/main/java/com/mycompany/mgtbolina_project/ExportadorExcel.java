@@ -13,6 +13,9 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 public class ExportadorExcel {
     
+    // 👇 CONSTANTE: Linha onde ficam os cabeçalhos (linha 2 = índice 1)
+    private static final int LINHA_HEADERS = 1;
+    
     /**
      * Lista todas as abas (sheets) disponíveis no arquivo Excel
      * @param filePath Caminho do arquivo Excel
@@ -184,12 +187,15 @@ public class ExportadorExcel {
                                      String unidade, String valorUnitario,
                                      List<Produto> listaDeProdutos) {
         
-        // Ler cabeçalhos
-        Row headers = sheet.getRow(0);
+        // 👇 MUDANÇA: Ler cabeçalhos na LINHA 2 (índice 1) em vez da linha 1 (índice 0)
+        Row headers = sheet.getRow(LINHA_HEADERS);
         
         if (headers == null) {
-            throw new RuntimeException("Planilha não possui cabeçalho na primeira linha!");
+            throw new RuntimeException("Planilha não possui cabeçalho na linha " + (LINHA_HEADERS + 1) + "!");
         }
+        
+        // Debug: mostra qual linha está sendo usada
+        System.out.println("📋 Lendo cabeçalhos da linha " + (LINHA_HEADERS + 1) + " (índice " + LINHA_HEADERS + ")");
         
         int colNota = -1;
         int colTotal = -1;
@@ -198,16 +204,16 @@ public class ExportadorExcel {
         int colForn = -1;
         int colDescricao = -1;
         int colValorUnit = -1;
-        int colUnidade = -1;  // 👈 NOVA COLUNA
+        int colUnidade = -1;
         
         // Identifica as colunas pelo nome do cabeçalho
         for (Cell cell : headers) {
             String nome = cell.getStringCellValue().trim().toUpperCase();
             
-            if (nome.contains("NOTA")) {
+            if (nome.contains("NF")) {
                 colNota = cell.getColumnIndex();
             }
-            if (nome.contains("VALOR") && (nome.contains("TOTAL") || !nome.contains("UNIT"))) {
+            if (nome.contains("VLR TOTAL") && (nome.contains("TOTAL") || !nome.contains("UNIT"))) {
                 colTotal = cell.getColumnIndex();
             }
             if (nome.contains("FORNECEDOR") || nome.contains("RAZAO")) {
@@ -219,13 +225,13 @@ public class ExportadorExcel {
             if (nome.contains("DATA")) {
                 colData = cell.getColumnIndex();
             }
-            if (nome.contains("DESCRI") || nome.contains("PRODUTO")) {
+            if (nome.contains("DESCRIÇÃO") || nome.contains("PRODUTO")) {
                 colDescricao = cell.getColumnIndex();
             }
-            if (nome.contains("UNIT")) {
+            if (nome.contains("VLR UNITÁRIO")) {
                 colValorUnit = cell.getColumnIndex();
             }
-            if (nome.contains("UNID")) {  // 👈 BUSCA PELA COLUNA UNIDADE
+            if (nome.contains("UNID")) {
                 colUnidade = cell.getColumnIndex();
             }
         }
@@ -239,19 +245,30 @@ public class ExportadorExcel {
         }
         
         System.out.println("Colunas identificadas:");
-        System.out.println("  Nota: " + colNota);
-        System.out.println("  Total: " + colTotal);
-        System.out.println("  Fornecedor: " + colForn);
-        System.out.println("  Data: " + colData);
-        System.out.println("  Placa: " + colPlacaVeiculo);
-        System.out.println("  Descrição: " + colDescricao);
-        System.out.println("  Valor Unitário: " + colValorUnit);
-        System.out.println("  Unidade: " + colUnidade);  // 👈
+        System.out.println("  Nota: " + (colNota >= 0 ? colNota : "NÃO ENCONTRADA"));
+        System.out.println("  Total: " + (colTotal >= 0 ? colTotal : "NÃO ENCONTRADA"));
+        System.out.println("  Fornecedor: " + (colForn >= 0 ? colForn : "NÃO ENCONTRADA"));
+        System.out.println("  Data: " + (colData >= 0 ? colData : "NÃO ENCONTRADA"));
+        System.out.println("  Placa: " + (colPlacaVeiculo >= 0 ? colPlacaVeiculo : "NÃO ENCONTRADA"));
+        System.out.println("  Descrição: " + (colDescricao >= 0 ? colDescricao : "NÃO ENCONTRADA"));
+        System.out.println("  Valor Unitário: " + (colValorUnit >= 0 ? colValorUnit : "NÃO ENCONTRADA"));
+        System.out.println("  Unidade: " + (colUnidade >= 0 ? colUnidade : "NÃO ENCONTRADA"));
+        
+        // 👇 MUDANÇA: Adiciona dados DEPOIS da linha de headers
+        // Procura a primeira linha vazia após os headers
+        int proximaLinhaVazia = LINHA_HEADERS + 1; // Começa na linha após headers
+        
+        // Encontra a última linha com dados (se houver)
+        int ultimaLinhaComDados = sheet.getLastRowNum();
+        if (ultimaLinhaComDados > LINHA_HEADERS) {
+            proximaLinhaVazia = ultimaLinhaComDados + 1;
+        }
+        
+        System.out.println("📝 Adicionando dados a partir da linha " + (proximaLinhaVazia + 1));
         
         // Escreve os dados
         int linhasAdicionadas = 0;
         for (Produto p : listaDeProdutos) {
-            int proximaLinhaVazia = sheet.getLastRowNum() + 1;
             Row row = sheet.createRow(proximaLinhaVazia);
             
             // Preenche os dados comuns (repetindo para cada produto)
@@ -279,7 +296,7 @@ public class ExportadorExcel {
                 row.createCell(5).setCellValue(p.descricao);
             }
             
-            // 👇 USA O VALOR UNITÁRIO DO PARÂMETRO (editável na interface)
+            // Usa o valor unitário do parâmetro (editável na interface)
             if (colValorUnit != -1) {
                 row.createCell(colValorUnit).setCellValue(valorUnitario != null ? valorUnitario : "");
             } else {
@@ -287,11 +304,12 @@ public class ExportadorExcel {
                 row.createCell(6).setCellValue(valorUnitario != null ? valorUnitario : "");
             }
             
-            // 👇 USA A UNIDADE DO PARÂMETRO (editável na interface)
+            // Usa a unidade do parâmetro (editável na interface)
             if (colUnidade != -1) {
                 row.createCell(colUnidade).setCellValue(unidade != null ? unidade : "");
             }
             
+            proximaLinhaVazia++;
             linhasAdicionadas++;
         }
         

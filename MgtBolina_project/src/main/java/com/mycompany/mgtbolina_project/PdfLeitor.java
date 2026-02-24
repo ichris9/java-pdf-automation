@@ -27,9 +27,9 @@ import java.util.List;
 import technology.tabula.RectangularTextContainer;
 
 /**
- * Leitor de PDF com detecção automática de PDFs escaneados
- * OCR configurado para funcionar SEM instalação externa do Tesseract
- * Usa tessdata embutido no JAR
+ * Leitor de PDF com detecção automática de PDFs escaneados.
+ * OCR configurado para funcionar SEM instalação externa do Tesseract.
+ * Usa tessdata embutido no JAR.
  */
 public class PdfLeitor {
     
@@ -37,37 +37,28 @@ public class PdfLeitor {
     private static Path tessdataPath = null;
     private static boolean tessdataExtraido = false;
     
-    public PdfLeitor() {
-        // Construtor padrão
-    }
+    public PdfLeitor() {}
     
     /**
-     * Método principal que detecta automaticamente se precisa usar OCR
+     * Método principal que detecta automaticamente se precisa usar OCR.
      */
     public String ExtractText(String filePath) {
         System.out.println("\n=== INICIANDO EXTRAÇÃO DE PDF ===");
         System.out.println("Arquivo: " + filePath);
         
         try {
-            // PASSO 1: Tenta extração normal com Tabula
             String textoTabula = extrairComTabula(filePath);
             
-            // PASSO 2: Verifica se o texto extraído é suficiente
             if (textoTabula != null && textoTabula.length() >= LIMITE_CARACTERES_MINIMO) {
                 System.out.println("✓ PDF contém texto extraível (" + textoTabula.length() + " caracteres)");
-                System.out.println("✓ Usando extração normal (Tabula)");
                 return textoTabula;
             }
             
-            // PASSO 3: Texto insuficiente - é um PDF escaneado!
-            System.out.println("⚠ PDF parece ser escaneado (apenas " + 
-                (textoTabula != null ? textoTabula.length() : 0) + " caracteres extraídos)");
-            System.out.println("🔍 Ativando OCR com Tesseract embutido...");
-            
+            System.out.println("⚠ PDF parece ser escaneado — ativando OCR...");
             String textoOCR = extrairComOCR(filePath);
             
             if (textoOCR != null && !textoOCR.trim().isEmpty()) {
-                System.out.println("✓ OCR concluído com sucesso (" + textoOCR.length() + " caracteres)");
+                System.out.println("✓ OCR concluído (" + textoOCR.length() + " caracteres)");
                 return textoOCR;
             } else {
                 System.err.println("❌ Falha no OCR - retornando texto parcial");
@@ -82,72 +73,92 @@ public class PdfLeitor {
     }
     
     /**
-     * Extração normal usando Tabula (para PDFs com texto)
+     * Extração combinada: texto bruto (PDFTextStripper) + tabelas (Tabula).
+     *
+     * PROBLEMA RESOLVIDO: O Tabula (SpreadsheetExtractionAlgorithm) falha em capturar
+     * certas células em alguns layouts de DANFE (ex: Ferrari) — as células de data de
+     * emissão, fornecedor e número da nota ficam vazias na extração por tabelas.
+     *
+     * SOLUÇÃO: Usar PDFTextStripper para extrair o texto bruto completo PRIMEIRO.
+     * Isso garante que data, fornecedor e número da nota estejam sempre disponíveis
+     * para o PdfColetorDados. Em seguida, o texto das tabelas (Tabula) é anexado,
+     * preservando a estrutura "COD | DESCRIÇÃO | NCM | ..." que o ColetorProdutos
+     * usa para identificar produtos.
      */
     private String extrairComTabula(String filePath) {
-        StringBuilder textoCompleto = new StringBuilder();
-        
+        StringBuilder textoFinal = new StringBuilder();
+
         try (PDDocument document = Loader.loadPDF(new File(filePath))) {
-            ObjectExtractor extractor = new ObjectExtractor(document);
-            PageIterator pageIterator = extractor.extract();
-            SpreadsheetExtractionAlgorithm algoritmo = new SpreadsheetExtractionAlgorithm();
-            
-            while (pageIterator.hasNext()) {
-                Page page = pageIterator.next();
-                List<Table> tables = algoritmo.extract(page);
-                
-                for (Table table : tables) {
-                    for (List<RectangularTextContainer> row : table.getRows()) {
-                        for (RectangularTextContainer cell : row) {
-                            textoCompleto.append(cell.getText()).append(" | ");
+
+            // PARTE 1: Texto bruto — captura TUDO (data, fornecedor, nota, etc.)
+            try {
+                PDFTextStripper stripper = new PDFTextStripper();
+                String textoBruto = stripper.getText(document);
+                if (textoBruto != null && !textoBruto.trim().isEmpty()) {
+                    textoFinal.append(textoBruto).append("\n\n");
+                    System.out.println("✓ PDFTextStripper: " + textoBruto.length() + " chars");
+                }
+            } catch (Exception e) {
+                System.err.println("Aviso: PDFTextStripper falhou: " + e.getMessage());
+            }
+
+            // PARTE 2: Tabelas Tabula — preserva estrutura de produtos
+            try {
+                ObjectExtractor extractor = new ObjectExtractor(document);
+                PageIterator pageIterator = extractor.extract();
+                SpreadsheetExtractionAlgorithm algoritmo = new SpreadsheetExtractionAlgorithm();
+                StringBuilder textoTabelas = new StringBuilder();
+
+                while (pageIterator.hasNext()) {
+                    Page page = pageIterator.next();
+                    List<Table> tables = algoritmo.extract(page);
+                    for (Table table : tables) {
+                        for (List<RectangularTextContainer> row : table.getRows()) {
+                            for (RectangularTextContainer cell : row) {
+                                textoTabelas.append(cell.getText()).append(" | ");
+                            }
+                            textoTabelas.append("\n");
                         }
-                        textoCompleto.append("\n");
                     }
                 }
+                textoFinal.append(textoTabelas);
+                System.out.println("✓ Tabula: " + textoTabelas.length() + " chars");
+            } catch (Exception e) {
+                System.err.println("Aviso: Tabula falhou: " + e.getMessage());
             }
-            
-            return textoCompleto.toString();
-            
+
+            return textoFinal.toString();
+
         } catch (Exception e) {
-            System.err.println("Erro ao usar Tabula: " + e.getMessage());
+            System.err.println("Erro ao abrir PDF: " + e.getMessage());
             return null;
         }
     }
     
     /**
-     * Prepara tessdata embutido (extrai do JAR ou baixa)
+     * Prepara tessdata embutido (extrai do JAR ou baixa).
      */
     private synchronized void prepararTessdata() throws IOException {
-        if (tessdataExtraido) {
-            return; // Já foi extraído
-        }
+        if (tessdataExtraido) return;
         
         try {
-            // Cria diretório temporário para tessdata
             Path tempDir = Files.createTempDirectory("tessdata");
             tessdataPath = tempDir;
-            
             System.out.println("📂 Preparando tessdata em: " + tessdataPath);
             
-            // Tenta extrair por.traineddata do JAR (se estiver embutido)
             String resourcePath = "/tessdata/por.traineddata";
             InputStream is = getClass().getResourceAsStream(resourcePath);
             
             if (is != null) {
-                // Extrai do JAR
                 Path porFile = tessdataPath.resolve("por.traineddata");
                 Files.copy(is, porFile, StandardCopyOption.REPLACE_EXISTING);
                 is.close();
                 System.out.println("✓ Tessdata extraído do JAR");
             } else {
-                // Não está embutido - tenta baixar
-                System.out.println("⚠ Tessdata não encontrado no JAR");
-                System.out.println("💡 Baixando por.traineddata da internet...");
+                System.out.println("⚠ Tessdata não encontrado no JAR — baixando...");
                 baixarTessdata();
             }
-            
             tessdataExtraido = true;
-            
         } catch (Exception e) {
             System.err.println("❌ Erro ao preparar tessdata: " + e.getMessage());
             throw e;
@@ -155,27 +166,19 @@ public class PdfLeitor {
     }
     
     /**
-     * Baixa tessdata da internet (fallback)
+     * Baixa tessdata da internet (fallback).
      */
     private void baixarTessdata() throws IOException {
         try {
-            // URL do arquivo por.traineddata do GitHub oficial do Tesseract
             String url = "https://github.com/tesseract-ocr/tessdata/raw/main/por.traineddata";
-            
             System.out.println("📥 Baixando de: " + url);
-            
             Path porFile = tessdataPath.resolve("por.traineddata");
             
-            // Baixa usando Java 11+ HttpClient
             java.net.http.HttpClient client = java.net.http.HttpClient.newHttpClient();
             java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder()
-                .uri(java.net.URI.create(url))
-                .build();
-            
+                .uri(java.net.URI.create(url)).build();
             java.net.http.HttpResponse<InputStream> response = client.send(
-                request, 
-                java.net.http.HttpResponse.BodyHandlers.ofInputStream()
-            );
+                request, java.net.http.HttpResponse.BodyHandlers.ofInputStream());
             
             if (response.statusCode() == 200) {
                 Files.copy(response.body(), porFile, StandardCopyOption.REPLACE_EXISTING);
@@ -183,7 +186,6 @@ public class PdfLeitor {
             } else {
                 throw new IOException("Falha no download: HTTP " + response.statusCode());
             }
-            
         } catch (Exception e) {
             System.err.println("❌ Erro ao baixar tessdata: " + e.getMessage());
             throw new IOException("Não foi possível obter tessdata", e);
@@ -191,43 +193,28 @@ public class PdfLeitor {
     }
     
     /**
-     * Extração usando OCR (Tesseract) para PDFs escaneados
+     * Extração usando OCR (Tesseract) para PDFs escaneados.
      */
     private String extrairComOCR(String filePath) {
         StringBuilder textoOCR = new StringBuilder();
         
         try (PDDocument document = Loader.loadPDF(new File(filePath))) {
-            
-            // Prepara tessdata
             prepararTessdata();
             
-            // Configura o Tesseract
             Tesseract tesseract = new Tesseract();
-            
-            // Define o caminho do tessdata extraído
             tesseract.setDatapath(tessdataPath.toString());
             System.out.println("📂 Usando tessdata em: " + tessdataPath);
-            
-            // Configura para português
             tesseract.setLanguage("por");
+            tesseract.setPageSegMode(1);
+            tesseract.setOcrEngineMode(1);
             
-            // Otimizações para melhorar precisão
-            tesseract.setPageSegMode(1); // Automatic page segmentation with OSD
-            tesseract.setOcrEngineMode(1); // Neural nets LSTM engine only
-            
-            // Renderiza o PDF em imagens
             PDFRenderer renderer = new PDFRenderer(document);
             int totalPaginas = document.getNumberOfPages();
-            
             System.out.println("📄 Processando " + totalPaginas + " página(s) com OCR...");
             
             for (int pagina = 0; pagina < totalPaginas; pagina++) {
                 System.out.println("  Processando página " + (pagina + 1) + "/" + totalPaginas + "...");
-                
-                // Renderiza a página em alta resolução (300 DPI para melhor OCR)
                 BufferedImage imagem = renderer.renderImageWithDPI(pagina, 300, ImageType.RGB);
-                
-                // Aplica OCR na imagem
                 String textoPagina = tesseract.doOCR(imagem);
                 
                 if (textoPagina != null && !textoPagina.trim().isEmpty()) {
@@ -247,7 +234,6 @@ public class PdfLeitor {
             return null;
         } catch (TesseractException e) {
             System.err.println("❌ Erro no Tesseract OCR: " + e.getMessage());
-            System.err.println("💡 Verifique se o arquivo por.traineddata foi baixado corretamente");
             e.printStackTrace();
             return null;
         } catch (Exception e) {
@@ -258,7 +244,7 @@ public class PdfLeitor {
     }
     
     /**
-     * Método auxiliar para detectar se um PDF é escaneado
+     * Método auxiliar para detectar se um PDF é escaneado.
      */
     public boolean isPDFEscaneado(String filePath) {
         try {
